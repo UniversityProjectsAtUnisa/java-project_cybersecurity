@@ -1,15 +1,23 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+import src.AppClient.AppClient;
+import src.AppServer.AppServer;
+import utils.AppTimer;
+import utils.Config;
 
-/**
- *
- * @author marco
- */
+
 public class MainRunner {
     public static void main(String[] args) {
-        
+        AppTimer globalAppTimer = AppTimer.getInstance();
+        AppServer appServer = new AppServer();
+        AppClient[] clients = new AppClient[Config.CLIENT_COUNT];
+
+        for (int i = 0; i < clients.length; i++) {
+            clients[i] = new AppClient();
+        }
+
+        for (AppClient client: clients) {
+            client.login();
+        }
+
+        globalAppTimer.start();
     }
 }
