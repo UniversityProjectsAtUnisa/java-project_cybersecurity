@@ -1,8 +1,8 @@
 package src.AppServer;
 
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import javax.crypto.SecretKey;
+import java.io.*;
+import java.security.KeyStore;
 
 public class ServerUtils {
 
@@ -76,5 +76,29 @@ public class ServerUtils {
                 fileReader.close();
             }
             return content;
+    }
+
+    public static void storeToKeyStore(SecretKey keyToStore, String password, String filepath, String keyAlias) throws Exception{
+        File file = new File(filepath);
+        KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+        if(!file.exists()){
+            keyStore.load(null,null);
+        }
+        keyStore.setKeyEntry(keyAlias,keyToStore,password.toCharArray(),null);
+        OutputStream writeStream = new FileOutputStream(filepath);
+        keyStore.store(writeStream,password.toCharArray());
+    }
+
+    public static SecretKey loadFromKeyStore(String filepath,String password,String keyAlias){
+        try{
+            KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            InputStream readStream = new FileInputStream(filepath);
+            keyStore.load(readStream,password.toCharArray());
+            SecretKey key = (SecretKey) keyStore.getKey(keyAlias,password.toCharArray());
+            return key;
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+        return null;
     }
 }
