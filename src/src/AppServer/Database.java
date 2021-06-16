@@ -32,7 +32,7 @@ public class Database {
         this.notificationTokens = new TreeSet<>();
     }
 
-    public boolean add_user(byte[] cf, int id, byte[] password, byte[] sale_utente) {
+    public boolean add_user(byte[] cf, byte[] password, byte[] sale_utente) {
         return users.add(new User(cf, password, sale_utente));
     }
 
