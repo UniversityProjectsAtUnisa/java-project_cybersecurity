@@ -88,6 +88,9 @@ public class ServerUtils {
         KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
         if(!file.exists()){
             keyStore.load(null,null);
+        }else{
+            InputStream keyStoreData = new FileInputStream(filepath);
+            keyStore.load(keyStoreData, password.toCharArray());
         }
         keyStore.setKeyEntry(keyAlias,keyToStore,password.toCharArray(),null);
         OutputStream writeStream = new FileOutputStream(filepath);

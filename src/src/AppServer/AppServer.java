@@ -13,7 +13,6 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.util.*;
 import java.sql.Timestamp;
 
-import com.sun.security.ntlm.Server;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -22,6 +21,8 @@ import entities.Contact;
 import entities.ContactReport;
 import entities.User;
 import entities.NotificationToken;
+
+import javax.crypto.SecretKey;
 
 /**
  *
@@ -51,8 +52,10 @@ public class AppServer {
 
     public AppServer() {
         this.database = new Database();
-
-        //keystore per i sali
+        SecretKey key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks","changeit","salt1");
+        this.salt1 = ServerUtils.toString(key1.getEncoded());
+        SecretKey key2 = ServerUtils.loadFromKeyStore("./salts_keystore.jks","changeit","salt2");
+        this.salt2 = ServerUtils.toString(key2.getEncoded());
     }
 
     public String login(String cf, String password) throws NoSuchAlgorithmException, InvalidKeyException {
