@@ -37,6 +37,9 @@ public class SSLServer implements Runnable {
     public SSLServer(int port, boolean withClientAutentication, String identityString) throws Exception {
         SSLContext sslContext = createSSLContext();
         SSLServerSocketFactory factory = sslContext.getServerSocketFactory();
+//        System.setProperty("javax.net.ssl.keyStore", "src/core/keys/keystore.jks");
+//        System.setProperty("javax.net.ssl.keyStorePassword", "changeit");
+//        SSLServerSocketFactory factory = (SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
         SSLServerSocket newSock = (SSLServerSocket) factory.createServerSocket(port);
         newSock.setNeedClientAuth(withClientAutentication);
         this.sSock = newSock;
@@ -58,7 +61,8 @@ public class SSLServer implements Runnable {
         TrustManagerFactory factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
         factory.init(trustStore);
         TrustManager[] trustManager = factory.getTrustManagers();
-        sslContext.init(keyManager, trustManager, null);
+//        sslContext.init(keyManager, trustManager, null);
+        sslContext.init(keyManager, null, null);
         return sslContext;
     }
 
@@ -96,6 +100,7 @@ public class SSLServer implements Runnable {
                 Response res = new Response();
                 out.writeObject(res);
                 out.flush();
+                acceptedSocket.close();
 
             } catch (ClassNotFoundException | IOException e) {
             } finally {

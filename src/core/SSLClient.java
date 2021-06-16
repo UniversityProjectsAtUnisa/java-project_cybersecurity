@@ -33,14 +33,26 @@ import javax.net.ssl.X509KeyManager;
  *
  * @author marco
  */
-public class SSLClient implements Closeable {
+public class SSLClient {
 
-    private SSLSocket socket;
+    private int port;
+    private boolean withClientAuthentication = false;
 
     public SSLClient(int port, boolean withClientAuthentication) throws Exception {
-        SSLContext sslContext = createSSLContext();
-        SSLSocketFactory factory = sslContext.getSocketFactory();
-        this.socket = (SSLSocket) factory.createSocket("localhost", port);
+//        SSLContext sslContext = createSSLContext();
+//        SSLSocketFactory factory = sslContext.getSocketFactory();
+        this.port = port;
+        this.withClientAuthentication = withClientAuthentication;
+
+    }
+
+    private SSLSocket createNewSocket() throws IOException {
+        System.setProperty("javax.net.ssl.trustStore", "src/core/keys/truststore.jks");
+        System.setProperty("javax.net.ssl.trustStorePassword", "changeit");
+        SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+        SSLSocket newSocket = (SSLSocket) factory.createSocket("localhost", port);
+        newSocket.startHandshake();
+        return newSocket;
     }
 
     public SSLClient(int port) throws Exception {
@@ -61,26 +73,19 @@ public class SSLClient implements Closeable {
     }
 
     public Response sendRequest(String endpointName) throws IOException, ClassNotFoundException {
-        this.socket.startHandshake();
+        SSLSocket socket = this.createNewSocket();
 
         Request request = new Request(endpointName);
 
         try (
-                ObjectOutputStream out = new ObjectOutputStream(this.socket.getOutputStream());
-                ObjectInputStream in = new ObjectInputStream(this.socket.getInputStream());) {
+                ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                ObjectInputStream in = new ObjectInputStream(socket.getInputStream());) {
             out.writeObject(request);
             out.flush();
             Response response = (Response) in.readObject();
             return response;
+        } catch (Exception e) {
         }
+        return null;
     }
-
-    @Override
-    public void close() {
-        try {
-            this.socket.close();
-        } catch (IOException e) {
-        }
-    }
-
 }

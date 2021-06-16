@@ -16,14 +16,16 @@ import utils.GlobalTimer;
 public class MainRunner {
 
     public static void main(String[] args) throws Exception {
-        
+//        System.setProperty("javax.net.debug", "ssl");
+
         GlobalTimer timer = new GlobalTimer(5000L);
-        
         SSLServer sServer = new SSLServer(4000);
-        AppClient appClient = new AppClient(4000);
         new Thread(sServer).start();
-        Thread.sleep(1000L);
-        appClient.startBluetoothPhase();
-//        new Thread(appClient).start();
+        AppClient appClient = new AppClient(4000, timer);
+        new Thread(appClient).start();
+        AppClient appClient1 = new AppClient(4000, timer);
+        new Thread(appClient1).start();
+        AppClient appClient2 = new AppClient(4000, timer);
+        new Thread(appClient2).start();
     }
 }

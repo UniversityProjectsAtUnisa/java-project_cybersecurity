@@ -5,11 +5,13 @@
  */
 package core;
 
+import java.io.Serializable;
+
 /**
  *
  * @author marco
  */
-public class Request {
+public class Request implements Serializable{
 
     private String endpointName;
     

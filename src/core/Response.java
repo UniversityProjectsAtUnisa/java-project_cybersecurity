@@ -5,10 +5,12 @@
  */
 package core;
 
+import java.io.Serializable;
+
 /**
  *
  * @author marco
  */
-public class Response {
+public class Response implements Serializable {
     public String message = "Messaggio";    
 }
