@@ -19,6 +19,7 @@ import java.time.format.DateTimeFormatter;
 
 import core.tokens.*;
 import entities.Contact;
+import entities.ContactReport;
 import entities.User;
 import entities.NotificationToken;
 
@@ -44,40 +45,17 @@ import entities.NotificationToken;
 
 public class AppServer {
 
-    private String salt1 = ""; //env.getSalt()
+    private String salt1 = "";
     private String salt2 = "";
     private Database database;
 
     public AppServer() {
-
         this.database = new Database();
 
-        try {
-            System.out.printf("Start App Server and init salts");
-            String fileContent = ServerUtils.fileRead(".env");
-            System.out.printf("Fetch salt from ev");
-            int comaIndex = fileContent.indexOf(",");
-            System.out.printf("Saving salts");
-            this.salt1 = fileContent.substring(0, comaIndex);
-            this.salt2 = fileContent.substring(comaIndex + 1, fileContent.length());
-        } catch (IOException e){
-            System.out.printf("Generate salt");
-            byte[] byteSalt1 = new byte[32];
-            byte[] byteSalt2 = new byte[32];
-            new SecureRandom().nextBytes(byteSalt1);
-            new SecureRandom().nextBytes(byteSalt2);
-            System.out.printf("Saving salts generated");
-            this.salt1 = ServerUtils.toString(byteSalt1);
-            this.salt2 = ServerUtils.toString(byteSalt2);
-            try {
-                ServerUtils.fileWrite(".env", this.getSalt1() + "," + this.getSalt2());
-            } catch(IOException ex){
-                System.out.printf("Error while saving new salts");
-            }
-        }
+        //keystore per i sali
     }
 
-    public String login(String cf, String password) throws NoSuchAlgorithmException {
+    public String login(String cf, String password) throws NoSuchAlgorithmException, InvalidKeyException {
         User user = this.database.find_user(ServerUtils.toByteArray(cf));
         if (user == null){
             return "error"; //maybe an exception
@@ -97,7 +75,7 @@ public class AppServer {
             AuthToken token = new AuthToken(id);
             return token.getToken(this.getSalt2());
         }
-        return false;
+        return "error";
     }
 
     public boolean register(String cf, String password) throws NoSuchAlgorithmException {
@@ -122,19 +100,26 @@ public class AppServer {
         String strIdUser = payload.substring(0, payload.indexOf(","));
         int idUser = Integer.parseInt(strIdUser);
         User user = this.database.find_user(idUser);
-        LinkedList<Contact> contacts = this.database.search_contacts_of_user(user.getCf());
+        byte[] cfSegnalatore = user.getCf();
+        byte[] cfSegnalato = this.database.find_user(id).getCf();
+
+
+        LinkedList<ContactReport> contacts = this.database.search_contactReport_of_users(cfSegnalato, cfSegnalatore);
 
         //algorithm
-        for (Contact c: contacts) {
+        for (ContactReport c: contacts) {
             if(c.getData_inizio_contatto().before(date)){
                 //the contact in the table is longer than new contact advisor
-              /*  if (data + duration < c.data + c.duration){
-                    Database.Contact.create(user.id, user, duration, date);
+                LocalDateTime datetime = date.toLocalDateTime();
+                LocalDateTime cDate = c.getData_inizio_contatto().toLocalDateTime().plusSeconds(c.getDurata());
+
+                if (datetime.plusSeconds(duration).isBefore(cDate)){
+                    this.database.add_contact(cfSegnalatore, cfSegnalato, duration, date);
                 } else {
-                    Database.Contact.create(user.id, user, c.duration, date);
-                    Database.TempContact.delete(c);
-                    Database.TempContact.insert(user.id, id, duration, date);
-                }*/
+                    this.database.add_contact(cfSegnalatore, cfSegnalato, c.getDurata(), date);
+                    this.database.remove_contactReport(cfSegnalato, cfSegnalatore, c.getData_inizio_contatto());
+                    this.database.add_contactReport(cfSegnalatore, cfSegnalato, duration, date);
+                }
             }
         }
         //end algorithm
@@ -142,13 +127,13 @@ public class AppServer {
         return true;
     }
 
-    public NotificationToken[] getNotifications(core.tokens.NotificationToken token){
+    public LinkedList<NotificationToken> getNotifications(core.tokens.NotificationToken token){
         String payload = token.getPayload();
         String strIdUser = payload.substring(0, payload.indexOf(","));
         int idUser = Integer.parseInt(strIdUser);
         User user = this.database.find_user(idUser);
 
-        //return this.database.getNotifications(user.id);
+        return this.database.search_notificationTokens_user(user.getId());
     }
 
     public boolean useNotification(String code){

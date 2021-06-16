@@ -165,7 +165,6 @@ public class Database {
             }
         }
         return null;
-        return null;
     }
 
     public LinkedList<NotificationToken> search_notificationTokens_user(int id) {
