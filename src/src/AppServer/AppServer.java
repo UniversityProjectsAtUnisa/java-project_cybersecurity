@@ -9,6 +9,11 @@ package src.AppServer;
  *
  * @author marco
  */
-public class AppServer {
+public class AppServer implements Runnable {
+
+    @Override
+    public void run() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
     
 }

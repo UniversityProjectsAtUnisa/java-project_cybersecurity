@@ -3,12 +3,12 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package utils;
+package core;
 
 /**
  *
  * @author marco
  */
-public class Timer {
-    
+public class Response {
+    public String message = "Messaggio";    
 }
