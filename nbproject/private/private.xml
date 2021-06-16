@@ -3,17 +3,22 @@
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
         <group>
-            <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/core/MyKeyManager.java</file>
+            <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/entities/User.java</file>
             <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/MainRunner.java</file>
-            <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/src/AppClient/AppClient.java</file>
             <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/core/SSLServer.java</file>
+            <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/entities/ContactReport.java</file>
             <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/core/Response.java</file>
             <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/utils/GlobalTimer.java</file>
             <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/core/Request.java</file>
-            <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/utils/Utils.java</file>
+            <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/entities/Contact.java</file>
+            <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/core/MyKeyManager.java</file>
+            <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/core/MyX509TrustManager.java</file>
+            <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/src/AppClient/AppClient.java</file>
+            <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/core/SSLClientProtocol.java</file>
             <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/core/SSLClient.java</file>
             <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/src/AppServer/AppServer.java</file>
             <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/src/AppClient/BluetoothModule.java</file>
+            <file>file:/C:/Users/marco/Documents/NetBeansProjects/Gruppo34/src/core/SSLServerProtocol.java</file>
         </group>
     </open-files>
 </project-private>

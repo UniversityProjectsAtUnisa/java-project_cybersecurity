@@ -10,17 +10,32 @@ import java.io.Serializable;
 /**
  *
  * @author marco
+ * @param <T>
  */
-public class Request implements Serializable{
+public class Request<T extends Serializable> implements Serializable {
 
-    private String endpointName;
-    
-    public Request(String endpointName) {
+    private final String endpointName;
+    private final T payload;
+
+    private Request(String endpointName, T payload) {
         this.endpointName = endpointName;
+        this.payload = payload;
     }
 
     public String getEndpointName() {
         return endpointName;
     }
-    
+
+    public T getPayload() {
+        return payload;
+    }
+
+    public static <T extends Serializable> Request<T> make(String endpointName, T payload) {
+        return new Request<>(endpointName, payload);
+    }
+
+    @Override
+    public String toString() {
+        return "Request: {endpointName: " + this.getEndpointName().toString() + " " + "payload: " + this.getPayload().toString() + "}"; //To change body of generated methods, choose Tools | Templates.
+    }
 }

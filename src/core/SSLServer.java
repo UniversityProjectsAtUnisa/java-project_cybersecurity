@@ -5,7 +5,7 @@
  */
 package core;
 
-import static core.SSLClient.createSSLContext;
+import entities.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
@@ -13,6 +13,7 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.security.KeyStore;
+import java.security.SecureRandom;
 
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
@@ -30,58 +31,40 @@ import javax.security.auth.x500.X500Principal;
 import utils.Utils;
 
 public class SSLServer implements Runnable {
-
+    
     private SSLServerSocket sSock;
-    private String identityString;
-
-    public SSLServer(int port, boolean withClientAutentication, String identityString) throws Exception {
-        SSLContext sslContext = createSSLContext();
+    
+    public SSLServer(int port, boolean withClientAuthentication) throws Exception {
+        SSLContext sslContext = createSSLContext(withClientAuthentication);
         SSLServerSocketFactory factory = sslContext.getServerSocketFactory();
-//        System.setProperty("javax.net.ssl.keyStore", "src/core/keys/keystore.jks");
-//        System.setProperty("javax.net.ssl.keyStorePassword", "changeit");
-//        SSLServerSocketFactory factory = (SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
         SSLServerSocket newSock = (SSLServerSocket) factory.createServerSocket(port);
-        newSock.setNeedClientAuth(withClientAutentication);
+        newSock.setNeedClientAuth(withClientAuthentication);
         this.sSock = newSock;
-        this.identityString = identityString;
         System.out.println("SSLServer initialized");
     }
-
+    
     public SSLServer(int port) throws Exception {
-        this(port, false, "");
+        this(port, false);
     }
-
-    static SSLContext createSSLContext() throws Exception {
+    
+    static SSLContext createSSLContext(boolean withClientAuthentication) throws Exception {
         SSLContext sslContext = SSLContext.getInstance("TLS");
-        X509KeyManager[] keyManager = new X509KeyManager[]{new MyKeyManager("src/core/keys/keystore.jks", "changeit".toCharArray(), "ssltest")};
-        InputStream stream = SSLClient.class.getResourceAsStream("src/core/keys/truststore.jks");
-        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
-        char[] trustStorePassword = "changeit".toCharArray();
-        trustStore.load(stream, trustStorePassword);
-        TrustManagerFactory factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-        factory.init(trustStore);
-        TrustManager[] trustManager = factory.getTrustManagers();
-//        sslContext.init(keyManager, trustManager, null);
-        sslContext.init(keyManager, null, null);
+        X509KeyManager[] keyManagers = new X509KeyManager[]{new MyKeyManager("src/core/keys/official_certificates/server/serverKeystore.jks", "changeit")};
+        TrustManager[] trustManagers = null;
+        if (withClientAuthentication) {
+            trustManagers = new TrustManager[]{
+                new MyX509TrustManager("src/core/keys/official_certificates/server/serverTruststore.jks", "changeit")};
+        }
+        sslContext.init(keyManagers, trustManagers, SecureRandom.getInstance("DEFAULT"));
         return sslContext;
     }
-
+    
     public SSLSocket accept() throws IOException {
-        boolean needsClientAuth = this.sSock.getNeedClientAuth();
         SSLSocket acceptedSocket = (SSLSocket) sSock.accept();
-        acceptedSocket.startHandshake();
-        if (needsClientAuth) {
-            verifyIdentity(acceptedSocket.getSession());
-        }
+        acceptedSocket.startHandshake();        
         return acceptedSocket;
     }
-
-    private boolean verifyIdentity(SSLSession session) throws SSLPeerUnverifiedException {
-        X500Principal id = (X500Principal) session.getPeerPrincipal();
-        System.out.println("principal: " + id.getName());
-        return id.getName().equals(identityString); // like "CN=localhost,OU=Students,O=unisa,C=IT"
-    }
-
+    
     @Override
     public void run() {
         ObjectInputStream in = null;
@@ -92,17 +75,17 @@ public class SSLServer implements Runnable {
                 System.out.println("Accepted incoming connection");
                 in = new ObjectInputStream(acceptedSocket.getInputStream());
                 out = new ObjectOutputStream(acceptedSocket.getOutputStream());
-
+                
                 Request req = (Request) in.readObject();
-
-                System.out.println("Il server ha rilevato " + req.getEndpointName());
-
-                Response res = new Response();
+                
+                System.out.println("Il server ha rilevato la richiesta: " + req);
+                Response res = Response.make(new Contact());
                 out.writeObject(res);
                 out.flush();
                 acceptedSocket.close();
-
+                
             } catch (ClassNotFoundException | IOException e) {
+                e.printStackTrace();
             } finally {
                 try {
                     in.close();
@@ -115,5 +98,5 @@ public class SSLServer implements Runnable {
             }
         }
     }
-
+    
 }

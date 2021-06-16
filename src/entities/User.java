@@ -5,10 +5,19 @@
  */
 package entities;
 
+import java.io.Serializable;
+
 /**
  *
  * @author marco
  */
-public class User {
-    
+public class User implements Serializable {
+
+    public String name = "Marco";
+
+    @Override
+    public String toString() {
+        return "User: {name: " + this.name.toString() + "}"; //To change body of generated methods, choose Tools | Templates.
+    }
+
 }

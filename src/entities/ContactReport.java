@@ -10,5 +10,11 @@ package entities;
  * @author marco
  */
 public class ContactReport {
+    public String type = "Temporaneo";
     
+    
+    @Override
+    public String toString() {
+        return "ContactReport: {type: " + this.type.toString() + "}"; //To change body of generated methods, choose Tools | Templates.
+    }
 }

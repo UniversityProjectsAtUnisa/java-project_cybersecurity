@@ -16,16 +16,22 @@ import java.io.IOException;
 public class MyKeyManager implements X509KeyManager {
 
     private KeyStore keyStore;
-    private String alias;
+    private String alias = "mykey";
     private char[] password;
-
-    MyKeyManager(String keyStoreFile, char[] password, String alias)
+    
+    MyKeyManager(String keyStoreFile, String password, String alias)
             throws IOException, GeneralSecurityException {
-        this.alias = alias;
-        this.password = password;
+        if (alias != null) {
+            this.alias = alias;
+        }
+        this.password = password.toCharArray();
         InputStream stream = new FileInputStream(keyStoreFile);
         keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-        keyStore.load(stream, password);
+        keyStore.load(stream, this.password);
+    }
+
+    MyKeyManager(String keyStoreFile, String password) throws IOException, GeneralSecurityException {
+        this(keyStoreFile, password, null);
     }
 
     public PrivateKey getPrivateKey(String alias) {

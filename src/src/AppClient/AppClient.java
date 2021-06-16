@@ -20,18 +20,23 @@ public class AppClient implements Runnable {
     private final GlobalTimer timer;
     private SSLClient client;
 
-    public AppClient(int port, GlobalTimer timer) throws Exception {
+    public AppClient(int port, GlobalTimer timer, boolean withClientAuthentication) throws Exception {
         this.port = port;
         this.timer = timer;
-        this.client = new SSLClient(this.port);
+        this.client = new SSLClient(this.port, withClientAuthentication);
         System.out.println("AppClient initialized");
+
+    }
+
+    public AppClient(int port, GlobalTimer timer) throws Exception {
+        this(port, timer, false);
     }
 
     public void startBluetoothPhase() {
         System.out.println("Bluetooth started");
         try {
             Response res = this.client.sendRequest("login");
-            System.out.println(res.message);
+            System.out.println("Il client ha ricevuto come risposta: " + res);
         } catch (Exception e) {
             e.printStackTrace();
         }

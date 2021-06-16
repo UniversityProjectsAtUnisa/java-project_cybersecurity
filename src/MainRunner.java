@@ -1,5 +1,7 @@
 
 import core.SSLServer;
+import java.security.Security;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import src.AppClient.AppClient;
 import src.AppServer.AppServer;
 import utils.GlobalTimer;
@@ -18,14 +20,13 @@ public class MainRunner {
     public static void main(String[] args) throws Exception {
 //        System.setProperty("javax.net.debug", "ssl");
 
+//        System.out.println(System.getProperty("user.dir"));
+        Security.insertProviderAt(new BouncyCastleProvider(), 1);
+        
         GlobalTimer timer = new GlobalTimer(5000L);
-        SSLServer sServer = new SSLServer(4000);
+        SSLServer sServer = new SSLServer(4000, false);
         new Thread(sServer).start();
-        AppClient appClient = new AppClient(4000, timer);
+        AppClient appClient = new AppClient(4000, timer, false);
         new Thread(appClient).start();
-        AppClient appClient1 = new AppClient(4000, timer);
-        new Thread(appClient1).start();
-        AppClient appClient2 = new AppClient(4000, timer);
-        new Thread(appClient2).start();
     }
 }
