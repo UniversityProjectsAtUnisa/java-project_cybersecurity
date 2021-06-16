@@ -5,10 +5,45 @@
  */
 package core.tokens;
 
+import src.AppServer.ServerUtils;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.security.InvalidKeyException;
+import java.security.Key;
+import java.security.NoSuchAlgorithmException;
+import java.util.Date;
+
 /**
- *
- * @author marco
- */
+ * Auth:         BASE64(id, data_creazione).HMACSHA256(BASE64(id, data_creazione), sale_2)
+ * */
 public class AuthToken extends BaseToken  {
-    
+
+    private int id;
+
+    public int getId() {
+        return id;
+    }
+
+    public AuthToken(int id) {
+        this.setPayload(id + "," + new Date().toString());
+        this.setSigma(id + "," + new Date().toString()); //+ "," + env.getSalt2()
+    }
+
+    public String getToken(int id, String salt2) throws NoSuchAlgorithmException, InvalidKeyException {
+
+        String payload = id + "," + new Date().toString();
+        this.setPayload(payload);
+        byte[] bytePayload = ServerUtils.toByteArray(this.getPayload());
+        String hexPayload = ServerUtils.toHex(bytePayload);
+
+
+        Mac hMac = Mac.getInstance("HMacSHA256");
+        Key hMacKey = new SecretKeySpec(ServerUtils.toByteArray(salt2), "HMacSHA256");
+        hMac.init(hMacKey);
+        hMac.update(bytePayload);
+        byte[] hMacRes = hMac.doFinal();
+        this.setSigma(ServerUtils.toString(hMacRes));
+        return this.getPayload() + "." + this.getSigma();
+    }
 }

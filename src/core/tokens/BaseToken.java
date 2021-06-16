@@ -5,10 +5,38 @@
  */
 package core.tokens;
 
+import java.nio.charset.StandardCharsets;
+
 /**
- *
- * @author marco
+ * Auth:         BASE64(id, data_creazione).HMACSHA256(BASE64(id, data_creazione), sale_2)
+ * Notification: BASE64(id, data_scadenza).HMACSHA256(BASE64(id, data_scadenza),SHA256(sale_2 || SHA256(sale_1  || codice_fiscale)))
  */
 public class BaseToken {
-    
+    private String payload;
+    private String sigma;
+
+    public BaseToken() {
+    }
+
+    public BaseToken(String raw) {
+        int separatorIndex = raw.indexOf(".");
+        this.payload = raw.substring(0, separatorIndex);
+        this.sigma = raw.substring(separatorIndex + 1);
+    }
+
+    public String getPayload() {
+        return payload;
+    }
+
+    public String getSigma() {
+        return sigma;
+    }
+
+    public void setPayload(String payload) {
+        this.payload = payload;
+    }
+
+    public void setSigma(String sigma) {
+        this.sigma = sigma;
+    }
 }
