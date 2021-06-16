@@ -152,6 +152,7 @@ public class Database {
             }
         }
         return null;
+        return null;
     }
 
     public boolean remove_notificationToken(String codice){

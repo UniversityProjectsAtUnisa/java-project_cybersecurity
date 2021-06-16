@@ -11,9 +11,16 @@ import java.security.MessageDigest;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Scanner;
+import java.sql.Timestamp;
 
 import com.sun.security.ntlm.Server;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
 import core.tokens.*;
+import entities.Contact;
+import entities.User;
+import entities.NotificationToken;
 
 /**
  *
@@ -39,8 +46,12 @@ public class AppServer {
 
     private String salt1 = ""; //env.getSalt()
     private String salt2 = "";
+    private Database database;
 
     public AppServer() {
+
+        this.database = new Database();
+
         try {
             System.out.printf("Start App Server and init salts");
             String fileContent = ServerUtils.fileRead(".env");
@@ -65,13 +76,13 @@ public class AppServer {
             }
         }
     }
-/*
+
     public String login(String cf, String password) throws NoSuchAlgorithmException {
-        User user = Database.User.getByCf(cf);
-        if (User == false){
+        User user = this.database.find_user(ServerUtils.toByteArray(cf));
+        if (user == null){
             return "error"; //maybe an exception
         }
-        String userSalt = User.getSalt();
+        String userSalt = user.getSale_utente();
         byte[] byteUserSalt = ServerUtils.toByteArray(userSalt);
         byte[] passwordBytes = password.getBytes();
 
@@ -81,41 +92,37 @@ public class AppServer {
         byte[] passwordHased = md.digest(passwordConcat);
 
         if (passwordHased == user.password){
-            Database.User.update(id, cf, Date.now());
-            AuthToken token = new AuthToken();
+            Timestamp now = ServerUtils.getNow();
+            this.database.update_user(user.getCf(), now, null, null);
+            AuthToken token = new AuthToken(user.id);
             Database.updateToken(use.id, token);
             return token.getToken(id, this.getSalt2());
         }
     }
 
-    public Boolean register(String cf, String password) throws NoSuchAlgorithmException {
+    public boolean register(String cf, String password) throws NoSuchAlgorithmException {
         if (!HealhApi.checkCf(cf)){
             return false;
         }
         byte[] passwordBytes = password.getBytes();
         byte[] userSalt = new byte[32];
         new SecureRandom().nextBytes(userSalt);
-        byte[] passwordConcat = new byte[passwordBytes.length + userSalt.length];
-        int pos = 0;
-        for (byte element : passwordBytes) {
-            passwordConcat[pos] = element;
-            pos++;
-        }
+        byte[] passwordConcat = ServerUtils.concatByteArray(passwordBytes, userSalt);
 
-        for (byte element : userSalt) {
-            passwordConcat[pos] = element;
-            pos++;
-        }
         MessageDigest md = MessageDigest.getInstance("SHA-256");
         byte[] passwordHased = md.digest(passwordConcat);
 
-        Database.User.create(cf, passwordHased, userSalt);
+        //this.database.add_user(cf, passwordHased, userSalt);
+
         return true;
     }
 
-    public Boolean createReport(int id, int duration, Date date, String token){
-        User user = Database.User.getUserByToken(token);
-        Contact[] contacts = Database.TempContacts.getById(user.id);
+    public boolean createReport(int id, int duration, Timestamp date, AuthToken token){
+        String payload = token.getPayload();
+        String strIdUser = payload.subString(0, payload.indexOf(","));
+        int idUser = Integer.parseInt(strId);
+        User user = this.database.find_user(idUser);
+        //Contact[] contacts = Database.search_contactReport(user.id);
 
         //algorithm
         for (Contact c: contacts) {
@@ -135,56 +142,56 @@ public class AppServer {
         return true;
     }
 
-    public Notification[] getNotifications(String token){
-        User user = Database.User.getByToken(token);
-        Notification[] notifications = Database.Notification.get(user.id);
-        return notification;
+    public NotificationToken[] getNotifications(String token){
+        String payload = token.getPayload();
+        String strIdUser = payload.subString(0, payload.indexOf(","));
+        int idUser = Integer.parseInt(strId);
+        User user = this.database.getUser(idUser);
+
+        return this.database.getNotifications(user.id);
     }
 
-    public Boolean useNotification(String code){
-        Notification notification = Database.Notification.get(code);
-        if (tampon == null){
+    public boolean useNotification(String code){
+        NotificationToken notification = this.database.search_notificationToken(code);
+        if (notification == null){
             return false;
         }
-        notification.setSuspension(new Date().now);
-        Database.Notification.update(notification);
         return true;
     }
 
-    public Notification getNotificationDetails(String code){
-        Notification notification = Database.Notification.get(code);
-        return notification;
+    public NotificationToken getNotificationDetails(String code){
+        return this.database.search_notificationToken(code);
     }
 
-    public Boolean notifyPositiveUser(String cf){
+    public boolean notifyPositiveUser(String cf){
         User user = Database.User.getByCf(cf);
-        Contact[] contacts = Database.Contact.get(user.id);
+        LinkedList<Contact> contacts = this.database.search_contacts_of_user(user.getCf());
 
         //algorithm
         for (Contact c: contacts) {
             Map durationMap = new HashMap<String, Integer>();
-            User user_i = Database.User.getById(id1);
-            User user_j = Database.User.getById(id2);
-               if (user_i.data_ultimo_tampone < Date.now() - 20 days &&  c.date > user_j.data_ultimo_tampone) {
+            User user_i = this.database.getUser(id1);
+            User user_j = this.database.getUser(id2);
+            LocalDateTime datetime = LocalDateTime.now();
+            System.out.println("Before subtraction of hours from date: "+datetime.format(formatter));
 
-                    //durationMap.
-                    //durationMap.add(user_i)
-                int x = 0;
-                } else if( user_i.data_ultimo_tampone < Date.now() - 20 days and c.date > user_j.data_ultimo_tampone) {
-                    //tempo[user_i] += minuti
-                }
+            datetime=datetime.minusDays(20);
+            String aftersubtraction=datetime.format(formatter);
+            System.out.println("After 1 hour subtraction from date: "+aftersubtraction);
 
         }
-
-
         //end algorithm
 
         for (User u: riskUser) {
-            String token = new NotificationToken().getToken(u.id, u.cf, this.getSalt1(), this.getSalt2());
-            Database.Notification.create(u.id, u.cf, token);
+            Timestamp instant= Timestamp.from(Instant.now());
+            //Per il momento metto come data di scadenza la data di adesso
+            NotificationToken token = new NotificationToken(u.id, u.cf, instant);
+            String strToken = token.getToken(this.getSalt1(), this.getSalt2());
+            this.database.add_notificationToken(strToken);
         }
+        return true;
 
-    }*/
+    }
 
     public String getSalt1() {
         return salt1;

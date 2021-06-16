@@ -3,6 +3,7 @@ package src.AppServer;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.sql.Timestamp;
 
 public class ServerUtils {
 
@@ -76,5 +77,10 @@ public class ServerUtils {
                 fileReader.close();
             }
             return content;
+    }
+
+    public static Timestamp getNow(){
+        Timestamp instant= Timestamp.from(Instant.now());
+        return instant;
     }
 }

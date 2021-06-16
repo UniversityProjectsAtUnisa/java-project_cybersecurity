@@ -20,17 +20,22 @@ import java.util.Date;
  * */
 public class NotificationToken extends BaseToken {
     private int id;
+    private String cf;
+    private Date expireDate;
 
     public int getId() {
         return id;
     }
 
-    public NotificationToken(int id, Date expireData) {
+    public NotificationToken(int id, String cf, Date expireData) {
+        this.id = id;
+        this.cf = cf;
+        this.expireDate = expireData;
         this.setPayload(id + "," + expireData);
         this.setSigma(id + "," + expireData) ; //+ "," + env.getSalt2()
     }
 
-    public String getToken(String cf, int id, String salt1, String salt2) throws NoSuchAlgorithmException, InvalidKeyException {
+    public String getToken(String salt1, String salt2) throws NoSuchAlgorithmException, InvalidKeyException {
         String expireDate = "";
         String payload = id + "," + expireDate;
         this.setPayload(payload);
