@@ -22,7 +22,7 @@ public class User {
     private Timestamp data_ultimo_tampone_positivo;
     private Timestamp data_creazione_ultimo_tampone;
 
-    public User(byte[] cf, int id,byte[] password,byte[] sale_utente) {
+    public User(byte[] cf,byte[] password,byte[] sale_utente) {
         this.cf = cf;
         this.id = count++;
         this.password = password;
@@ -32,7 +32,7 @@ public class User {
         this.data_ultimo_tampone_positivo = null;
     }
 
-    public User(byte[] cf, int id,byte[] password,byte[] sale_utente,
+    public User(byte[] cf,byte[] password,byte[] sale_utente,
                 Timestamp data_ultimo_login, Timestamp data_creazione_ultimo_tampone,
                 Timestamp data_ultimo_tampone_positivo) {
         this.cf = cf;
@@ -91,6 +91,7 @@ public class User {
     public void setData_creazione_ultimo_tampone(Timestamp data_creazione_ultimo_tampone) {
         this.data_creazione_ultimo_tampone = data_creazione_ultimo_tampone;
     }
+
 
     @Override
     public boolean equals(Object o) {

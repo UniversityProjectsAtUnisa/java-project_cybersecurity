@@ -10,6 +10,7 @@ import entities.ContactReport;
 import entities.NotificationToken;
 import entities.User;
 
+import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -32,7 +33,7 @@ public class Database {
     }
 
     public boolean add_user(byte[] cf, int id, byte[] password, byte[] sale_utente) {
-        return users.add(new User(cf, id, password, sale_utente));
+        return users.add(new User(cf, password, sale_utente));
     }
 
     public User find_user(byte[] cf) {
@@ -98,8 +99,20 @@ public class Database {
         return null;
     }
 
-    public boolean remove_contactReport(byte[] id_segnalatore, byte[] id_segnalato, Timestamp data_inizio_contatto){
-        return contactReports.remove(search_contactReport(id_segnalatore,id_segnalato,data_inizio_contatto));
+    public LinkedList<ContactReport> search_contactReport_of_users(byte[] id_segnalatore, byte[] id_segnalato) {
+        LinkedList<ContactReport> contactReports_user = new LinkedList<>();
+        Iterator<ContactReport> iterator = contactReports.iterator();
+        while (iterator.hasNext()) {
+            ContactReport contactReport = iterator.next();
+            if (contactReport.getId_segnalatore() == id_segnalatore && contactReport.getId_segnalato() == id_segnalato) {
+                contactReports_user.add(contactReport);
+            }
+        }
+        return contactReports_user;
+    }
+
+    public boolean remove_contactReport(byte[] id_segnalatore, byte[] id_segnalato, Timestamp data_inizio_contatto) {
+        return contactReports.remove(search_contactReport(id_segnalatore, id_segnalato, data_inizio_contatto));
     }
 
 
@@ -131,19 +144,19 @@ public class Database {
         return user_contacts;
     }
 
-    public boolean remove_contact(byte[] id_segnalatore, byte[] id_segnalato, Timestamp data_inizio_contatto){
-        return contacts.remove(search_contact(id_segnalatore,id_segnalato,data_inizio_contatto));
+    public boolean remove_contact(byte[] id_segnalatore, byte[] id_segnalato, Timestamp data_inizio_contatto) {
+        return contacts.remove(search_contact(id_segnalatore, id_segnalato, data_inizio_contatto));
     }
 
-    public boolean remove_contacts_user(byte[] id_user){
+    public boolean remove_contacts_user(byte[] id_user) {
         return contacts.removeAll(search_contacts_of_user(id_user));
     }
 
-    public boolean add_notificationToken(String codice, Timestamp data_revoca){
-        return notificationTokens.add(new NotificationToken(codice,data_revoca));
+    public boolean add_notificationToken(String codice, int id) {
+        return notificationTokens.add(new NotificationToken(codice, id));
     }
 
-    public NotificationToken search_notificationToken(String codice){
+    public NotificationToken search_notificationToken(String codice) {
         Iterator<NotificationToken> iterator = notificationTokens.iterator();
         while (iterator.hasNext()) {
             NotificationToken notificationToken = iterator.next();
@@ -154,7 +167,13 @@ public class Database {
         return null;
     }
 
-    public boolean remove_notificationToken(String codice){
+    public NotificationToken update_notificationToken(String codice, Timestamp data_revoca){
+        NotificationToken notificationToken = search_notificationToken(codice);
+        notificationToken.setData_revoca(data_revoca);
+        return notificationToken;
+    }
+
+    public boolean remove_notificationToken(String codice) {
         return notificationTokens.remove(search_notificationToken(codice));
     }
 }

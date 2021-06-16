@@ -14,12 +14,14 @@ import java.util.Date;
 public class NotificationToken {
     private final String codice;
     private Timestamp data_scadenza;
-    private final Timestamp data_revoca;
+    private Timestamp data_revoca;
+    private final int id;
 
-    public NotificationToken(String codice, Timestamp data_revoca) {
+    public NotificationToken(String codice, int id) {
         this.codice = codice;
         this.data_scadenza = this.getData_scadenza_from_codice(codice);
-        this.data_revoca = data_revoca;
+        this.data_revoca = null;
+        this.id = id;
     }
 
     private Timestamp getData_scadenza_from_codice(String codice) {
@@ -52,5 +54,13 @@ public class NotificationToken {
         if (o == null || getClass() != o.getClass()) return false;
         NotificationToken that = (NotificationToken) o;
         return codice.equals(that.codice) && data_scadenza.equals(that.data_scadenza) && data_revoca.equals(that.data_revoca);
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setData_revoca(Timestamp data_revoca) {
+        this.data_revoca = data_revoca;
     }
 }
