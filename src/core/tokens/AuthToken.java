@@ -26,11 +26,12 @@ public class AuthToken extends BaseToken  {
     }
 
     public AuthToken(int id) {
+        this.id = id;
         this.setPayload(id + "," + new Date().toString());
         this.setSigma(id + "," + new Date().toString()); //+ "," + env.getSalt2()
     }
 
-    public String getToken(int id, String salt2) throws NoSuchAlgorithmException, InvalidKeyException {
+    public String getToken(String salt2) throws NoSuchAlgorithmException, InvalidKeyException {
 
         String payload = id + "," + new Date().toString();
         this.setPayload(payload);

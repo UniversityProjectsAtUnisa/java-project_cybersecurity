@@ -15,22 +15,28 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Date;
 
+import java.sql.Timestamp;
+
 /**
  * Notification: BASE64(id, data_scadenza).HMACSHA256(BASE64(id, data_scadenza),SHA256(sale_2 || SHA256(sale_1  || codice_fiscale)))
  * */
 public class NotificationToken extends BaseToken {
     private int id;
+    private String cf;
+    private Date expireDate;
 
     public int getId() {
         return id;
     }
 
-    public NotificationToken(int id, Date expireData) {
+    public NotificationToken(int id, String cf, Timestamp expireData) {
+        this.id = id;
+        this.cf = cf;
+        this.expireDate = expireData;
         this.setPayload(id + "," + expireData);
-        this.setSigma(id + "," + expireData) ; //+ "," + env.getSalt2()
     }
 
-    public String getToken(String cf, int id, String salt1, String salt2) throws NoSuchAlgorithmException, InvalidKeyException {
+    public String getToken(String salt1, String salt2) throws NoSuchAlgorithmException, InvalidKeyException {
         String expireDate = "";
         String payload = id + "," + expireDate;
         this.setPayload(payload);
@@ -38,7 +44,7 @@ public class NotificationToken extends BaseToken {
         byte[] bytePayload = ServerUtils.toByteArray(this.getPayload());
 
         MessageDigest md = MessageDigest.getInstance("SHA-256");
-        byte[] partialInSigma = md.digest(ServerUtils.toByteArray(salt1 + cf));
+        byte[] partialInSigma = md.digest(ServerUtils.toByteArray(salt1 + this.cf));
 
         byte[] secondPartSigma = md.digest(ServerUtils.concatByteArray(
                 ServerUtils.toByteArray(salt2), partialInSigma));
@@ -53,5 +59,13 @@ public class NotificationToken extends BaseToken {
         this.setSigma(ServerUtils.toString(hMacRes));
 
         return this.getPayload() + "." + this.getSigma();
+    }
+
+    public String getCf() {
+        return cf;
+    }
+
+    public Date getExpireDate() {
+        return expireDate;
     }
 }

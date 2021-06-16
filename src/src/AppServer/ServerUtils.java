@@ -3,6 +3,11 @@ package src.AppServer;
 import javax.crypto.SecretKey;
 import java.io.*;
 import java.security.KeyStore;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.sql.Timestamp;
+import java.time.Instant;
 
 public class ServerUtils {
 
@@ -89,16 +94,21 @@ public class ServerUtils {
         keyStore.store(writeStream,password.toCharArray());
     }
 
-    public static SecretKey loadFromKeyStore(String filepath,String password,String keyAlias){
-        try{
+    public static SecretKey loadFromKeyStore(String filepath,String password,String keyAlias) {
+        try {
             KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
             InputStream readStream = new FileInputStream(filepath);
-            keyStore.load(readStream,password.toCharArray());
-            SecretKey key = (SecretKey) keyStore.getKey(keyAlias,password.toCharArray());
+            keyStore.load(readStream, password.toCharArray());
+            SecretKey key = (SecretKey) keyStore.getKey(keyAlias, password.toCharArray());
             return key;
         } catch (Exception e) {
             System.out.println(e);
         }
         return null;
+    }
+
+    public static Timestamp getNow(){
+        Timestamp instant= Timestamp.from(Instant.now());
+        return instant;
     }
 }
