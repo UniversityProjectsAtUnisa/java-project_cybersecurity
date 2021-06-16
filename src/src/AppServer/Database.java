@@ -168,7 +168,19 @@ public class Database {
         return null;
     }
 
-    public NotificationToken update_notificationToken(String codice, Timestamp data_revoca){
+    public LinkedList<NotificationToken> search_notificationTokens_user(int id) {
+        LinkedList<NotificationToken> notificationTokens_user = new LinkedList<>();
+        Iterator<NotificationToken> iterator = notificationTokens_user.iterator();
+        while(iterator.hasNext()){
+            NotificationToken notificationToken = iterator.next();
+            if(notificationToken.getId() == id){
+                notificationTokens_user.add(notificationToken);
+            }
+        }
+        return notificationTokens_user;
+    }
+
+    public NotificationToken update_notificationToken(String codice, Timestamp data_revoca) {
         NotificationToken notificationToken = search_notificationToken(codice);
         notificationToken.setData_revoca(data_revoca);
         return notificationToken;
