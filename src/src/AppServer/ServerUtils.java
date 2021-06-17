@@ -35,7 +35,6 @@ public class ServerUtils {
         return new String(chars);
     }
 
-
     public static String toString(
             byte[] bytes) {
         return toString(bytes, bytes.length);
@@ -69,10 +68,12 @@ public class ServerUtils {
     }
 
     public static boolean fileWrite(String path, String content) throws IOException {
-        FileWriter fileWriter = new FileWriter(path);
-        String fileContent = content;
-        fileWriter.write(fileContent);
-        fileWriter.close();
+        try (FileWriter fileWriter = new FileWriter(path)) {
+            String fileContent = content;
+            fileWriter.write(fileContent);
+        } catch (IOException e) {
+            return false;
+        }
         return true;
     }
 

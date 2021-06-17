@@ -20,13 +20,13 @@ import java.util.TreeSet;
  *
  */
 public class Database {
-    private TreeSet<User> users;
-    private TreeSet<ContactReport> contactReports;
-    private TreeSet<Contact> contacts;
-    private TreeSet<NotificationToken> notificationTokens;
+    private final TreeSet<User> users;
+    private final TreeSet<ContactReport> contactReports;
+    private final TreeSet<Contact> contacts;
+    private final TreeSet<NotificationToken> notificationTokens;
 
     public Database() {
-        this.users = new TreeSet<User>();
+        this.users = new TreeSet<>();
         this.contactReports = new TreeSet<>();
         this.contacts = new TreeSet<>();
         this.notificationTokens = new TreeSet<>();
@@ -193,13 +193,4 @@ public class Database {
         return notificationTokens.remove(searchNotificationToken(code));
     }
 
-    //develop
-
-    public TreeSet<ContactReport> getContactReports() {
-        return contactReports;
-    }
-
-    public TreeSet<NotificationToken> getNotificationTokens() {
-        return notificationTokens;
-    }
 }

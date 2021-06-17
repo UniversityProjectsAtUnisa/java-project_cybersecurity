@@ -1,6 +1,6 @@
 package src.AppClient;
 
-import entities.Credentials;
+import utils.Credentials;
 import utils.SimulationData;
 
 public class FakeInput {

@@ -1,9 +1,5 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package src.AppServer;
+import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -13,11 +9,16 @@ import java.sql.Timestamp;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.logging.Logger;
 
+import core.Request;
+import core.Response;
+import core.SSLServer;
 import core.tokens.*;
 import entities.Contact;
 import entities.ContactReport;
 import entities.User;
+import utils.Config;
 
 import javax.crypto.SecretKey;
 import javax.xml.crypto.Data;
@@ -55,6 +56,7 @@ public class AppServer {
         SecretKey key2 = ServerUtils.loadFromKeyStore("./salts_keystore.jks","changeit","salt2");
         this.salt2 = ServerUtils.toString(key2.getEncoded());
     }
+
 /*
     public <T> void handleRequest(Request req){
         <V> payload = req.getPayload();
@@ -300,7 +302,4 @@ public class AppServer {
     public String getSalt2() {
         return salt2;
     }
-
-    //develop
-    public Database getDatabase() {return this.database;}
 }
