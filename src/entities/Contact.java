@@ -14,8 +14,8 @@ import java.util.Arrays;
  */
 public class Contact extends ContactReport {
 
-    public Contact(byte[] id_segnalatore, byte[] id_segnalato, int durata, Timestamp data_inizio_contatto) {
-        super(id_segnalatore, id_segnalato, durata, data_inizio_contatto);
+    public Contact(byte[] reporterId, byte[] reportedId, int duration, Timestamp startContactDate) {
+        super(reporterId, reportedId, duration, startContactDate);
     }
 
     @Override
@@ -23,7 +23,7 @@ public class Contact extends ContactReport {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ContactReport that = (ContactReport) o;
-        return this.getDurata() == that.getDurata() && ((Arrays.equals(getId_segnalatore(), that.getId_segnalato()) && Arrays.equals(getId_segnalato(), that.getId_segnalato())) ||
-                (Arrays.equals(getId_segnalatore(), that.getId_segnalato()) && Arrays.equals(getId_segnalato(), that.getId_segnalatore()))) && getData_inizio_contatto().equals(that.getData_inizio_contatto());
+        return this.getDuration() == that.getDuration() && ((Arrays.equals(getReporterId(), that.getReportedId()) && Arrays.equals(getReportedId(), that.getReportedId())) ||
+                (Arrays.equals(getReporterId(), that.getReportedId()) && Arrays.equals(getReportedId(), that.getReporterId()))) && getStartContactDate().equals(that.getStartContactDate());
     }
 }

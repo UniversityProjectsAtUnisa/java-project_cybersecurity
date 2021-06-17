@@ -10,7 +10,6 @@ import entities.ContactReport;
 import entities.NotificationToken;
 import entities.User;
 
-import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -32,11 +31,11 @@ public class Database {
         this.notificationTokens = new TreeSet<>();
     }
 
-    public boolean add_user(byte[] cf, byte[] password, byte[] sale_utente) {
-        return users.add(new User(cf, password, sale_utente));
+    public boolean addUser(byte[] cf, byte[] password, byte[] userSalt) {
+        return users.add(new User(cf, password, userSalt));
     }
 
-    public User find_user(byte[] cf) {
+    public User findUser(byte[] cf) {
         Iterator<User> iterator = users.iterator();
         while (iterator.hasNext()) {
             User user = iterator.next();
@@ -47,7 +46,7 @@ public class Database {
         return null;
     }
 
-    public User find_user(int id) {
+    public User findUser(int id) {
         Iterator<User> iterator = users.iterator();
         while (iterator.hasNext()) {
             User user = iterator.next();
@@ -58,134 +57,134 @@ public class Database {
         return null;
     }
 
-    public User update_user(byte[] cf, Timestamp data_ultimo_login, Timestamp data_creazione_ultimo_tampone,
-                            Timestamp data_ultimo_tampone_positivo) {
-        User user = find_user(cf);
-        if (data_ultimo_login != null) {
-            user.setData_ultimo_login(data_ultimo_login);
+    public User updateUser(byte[] cf, Timestamp lastLoginDate, Timestamp lastSwabCreationDate,
+                           Timestamp lastPositiveSwabDate) {
+        User user = findUser(cf);
+        if (lastLoginDate != null) {
+            user.setLastLoginDate(lastLoginDate);
             return user;
         }
-        if (data_creazione_ultimo_tampone != null) {
-            user.setData_creazione_ultimo_tampone(data_creazione_ultimo_tampone);
+        if (lastPositiveSwabDate != null) {
+            user.setLastSwabCreationDate(lastPositiveSwabDate);
             return user;
         }
-        if (data_ultimo_tampone_positivo != null) {
-            user.setData_ultimo_tampone_positivo(data_ultimo_tampone_positivo);
+        if (lastPositiveSwabDate != null) {
+            user.setLastPositiveSwabDate(lastPositiveSwabDate);
             return user;
         }
         return user;
     }
 
-    public boolean remove_user(byte[] cf) {
-        return users.remove(find_user(cf));
+    public boolean removeUser(byte[] cf) {
+        return users.remove(findUser(cf));
     }
 
-    public boolean remove_user(int id) {
-        return users.remove(find_user(id));
+    public boolean removeUser(int id) {
+        return users.remove(findUser(id));
     }
 
-    public boolean add_contactReport(byte[] id_segnalatore, byte[] id_segnalato, int durata, Timestamp data_inizio_contatto) {
-        return contactReports.add(new ContactReport(id_segnalatore, id_segnalato, durata, data_inizio_contatto));
+    public boolean addContactReport(byte[] reporterId, byte[] reportedId, int duration, Timestamp startContactDate) {
+        return contactReports.add(new ContactReport(reporterId, reportedId, duration, startContactDate));
     }
 
-    public ContactReport search_contactReport(byte[] id_segnalatore, byte[] id_segnalato, Timestamp data_inizio_contatto) {
+    public ContactReport searchContactReport(byte[] reporterId, byte[] reportedId, Timestamp startContactDate) {
         Iterator<ContactReport> iterator = contactReports.iterator();
         while (iterator.hasNext()) {
             ContactReport contactReport = iterator.next();
-            if (contactReport.getId_segnalatore() == id_segnalatore && contactReport.getId_segnalato() == id_segnalato && contactReport.getData_inizio_contatto() == data_inizio_contatto) {
+            if (contactReport.getReporterId() == reporterId && contactReport.getReportedId() == reportedId && contactReport.getStartContactDate() == startContactDate) {
                 return contactReport;
             }
         }
         return null;
     }
 
-    public LinkedList<ContactReport> search_contactReport_of_users(byte[] id_segnalatore, byte[] id_segnalato) {
-        LinkedList<ContactReport> contactReports_user = new LinkedList<>();
+    public LinkedList<ContactReport> searchContactReportOfUsers(byte[] reporterId, byte[] reportedId) {
+        LinkedList<ContactReport> userContactReports = new LinkedList<>();
         Iterator<ContactReport> iterator = contactReports.iterator();
         while (iterator.hasNext()) {
             ContactReport contactReport = iterator.next();
-            if (contactReport.getId_segnalatore() == id_segnalatore && contactReport.getId_segnalato() == id_segnalato) {
-                contactReports_user.add(contactReport);
+            if (contactReport.getReporterId() == reporterId && contactReport.getReportedId() == reportedId) {
+                userContactReports.add(contactReport);
             }
         }
-        return contactReports_user;
+        return userContactReports;
     }
 
-    public boolean remove_contactReport(byte[] id_segnalatore, byte[] id_segnalato, Timestamp data_inizio_contatto) {
-        return contactReports.remove(search_contactReport(id_segnalatore, id_segnalato, data_inizio_contatto));
+    public boolean removeContactReport(byte[] reporterId, byte[] reportedId, Timestamp startContactDate) {
+        return contactReports.remove(searchContactReport(reporterId, reportedId, startContactDate));
     }
 
 
-    public boolean add_contact(byte[] id_segnalatore, byte[] id_segnalato, int durata, Timestamp data_inizio_contatto) {
-        return contacts.add(new Contact(id_segnalatore, id_segnalato, durata, data_inizio_contatto));
+    public boolean addContact(byte[] reporterId, byte[] reportedId, int duration, Timestamp startContactDate) {
+        return contacts.add(new Contact(reporterId, reportedId, duration, startContactDate));
     }
 
-    public Contact search_contact(byte[] id_segnalatore, byte[] id_segnalato, Timestamp data_inizio_contatto) {
+    public Contact searchContact(byte[] reporterId, byte[] reportedId, Timestamp startContactDate) {
         Iterator<Contact> iterator = contacts.iterator();
         while (iterator.hasNext()) {
             Contact contact = iterator.next();
-            if (contact.getId_segnalatore() == id_segnalatore && contact.getId_segnalato() == id_segnalato && contact.getData_inizio_contatto() == data_inizio_contatto) {
+            if (contact.getReporterId() == reporterId && contact.getReportedId() == reportedId && contact.getStartContactDate() == startContactDate) {
                 return contact;
             }
         }
         return null;
     }
 
-    public LinkedList<Contact> search_contacts_of_user(byte[] id_user) {
-        LinkedList<Contact> user_contacts = new LinkedList<>();
+    public LinkedList<Contact> searchContactsOfUser(byte[] id_user) {
+        LinkedList<Contact> userContacts = new LinkedList<>();
         Iterator<Contact> iterator = contacts.iterator();
 
         while (iterator.hasNext()) {
             Contact contact = iterator.next();
-            if (contact.getId_segnalatore() == id_user || contact.getId_segnalato() == id_user) {
-                user_contacts.add(contact);
+            if (contact.getReporterId() == id_user || contact.getReportedId() == id_user) {
+                userContacts.add(contact);
             }
         }
-        return user_contacts;
+        return userContacts;
     }
 
-    public boolean remove_contact(byte[] id_segnalatore, byte[] id_segnalato, Timestamp data_inizio_contatto) {
-        return contacts.remove(search_contact(id_segnalatore, id_segnalato, data_inizio_contatto));
+    public boolean removeContact(byte[] reporterId, byte[] reportedId, Timestamp startContactDate) {
+        return contacts.remove(searchContact(reporterId, reportedId, startContactDate));
     }
 
-    public boolean remove_contacts_user(byte[] id_user) {
-        return contacts.removeAll(search_contacts_of_user(id_user));
+    public boolean removeContactsUser(byte[] id_user) {
+        return contacts.removeAll(searchContactsOfUser(id_user));
     }
 
-    public boolean add_notificationToken(String codice, int id) {
-        return notificationTokens.add(new NotificationToken(codice, id));
+    public boolean addNotificationToken(String code, int id) {
+        return notificationTokens.add(new NotificationToken(code, id));
     }
 
-    public NotificationToken search_notificationToken(String codice) {
+    public NotificationToken searchNotificationToken(String code) {
         Iterator<NotificationToken> iterator = notificationTokens.iterator();
         while (iterator.hasNext()) {
             NotificationToken notificationToken = iterator.next();
-            if (notificationToken.getCodice() == codice) {
+            if (notificationToken.getCode() == code) {
                 return notificationToken;
             }
         }
         return null;
     }
 
-    public LinkedList<NotificationToken> search_notificationTokens_user(int id) {
-        LinkedList<NotificationToken> notificationTokens_user = new LinkedList<>();
-        Iterator<NotificationToken> iterator = notificationTokens_user.iterator();
+    public LinkedList<NotificationToken> searchUserNotificationTokens(int id) {
+        LinkedList<NotificationToken> userNotificationTokens = new LinkedList<>();
+        Iterator<NotificationToken> iterator = userNotificationTokens.iterator();
         while(iterator.hasNext()){
             NotificationToken notificationToken = iterator.next();
             if(notificationToken.getId() == id){
-                notificationTokens_user.add(notificationToken);
+                userNotificationTokens.add(notificationToken);
             }
         }
-        return notificationTokens_user;
+        return userNotificationTokens;
     }
 
-    public NotificationToken update_notificationToken(String codice, Timestamp data_revoca) {
-        NotificationToken notificationToken = search_notificationToken(codice);
-        notificationToken.setData_revoca(data_revoca);
+    public NotificationToken updateNotificationToken(String code, Timestamp suspensionDate) {
+        NotificationToken notificationToken = searchNotificationToken(code);
+        notificationToken.setSuspensionDate(suspensionDate);
         return notificationToken;
     }
 
-    public boolean remove_notificationToken(String codice) {
-        return notificationTokens.remove(search_notificationToken(codice));
+    public boolean removeNotificationToken(String code) {
+        return notificationTokens.remove(searchNotificationToken(code));
     }
 }

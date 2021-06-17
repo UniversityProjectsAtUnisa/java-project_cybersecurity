@@ -18,7 +18,6 @@ import core.tokens.*;
 import entities.Contact;
 import entities.ContactReport;
 import entities.User;
-import entities.NotificationToken;
 
 import javax.crypto.SecretKey;
 
@@ -55,32 +54,61 @@ public class AppServer {
         SecretKey key2 = ServerUtils.loadFromKeyStore("./salts_keystore.jks","changeit","salt2");
         this.salt2 = ServerUtils.toString(key2.getEncoded());
     }
-
+/*
+    public <T> void handleRequest(Request req){
+        <V> payload = req.getPayload();
+        <T> response;
+        switch(req.getName()){
+            case 'login':
+                response = this.login(payload.getCf(), payload.getPassword());
+                break;
+            case 'register':
+                response = this.register(payload.getCf(), payload.getPassword());
+                break;
+            case 'createReport':
+                response = this.createReport(payload.getId(), payload.getDuration(), payload.getDate(), payload.getToken());
+                break;
+            case 'getNotifications':
+                response = this.getNotifications(payload.getToken());
+                break;
+            case 'useNotifications':
+                response = this.useNotification(payload.getCode());
+                break;
+            case 'getNotificationsDetails':
+                response = this.getNotificationsDetails(payload.getCode());
+                break;
+            case 'notifyPositiveUser':
+                response = this.notifyPositiveUser(payload.getCf());
+                break;
+        }
+        return response;
+    }
+*/
     public String login(String cf, String password) throws NoSuchAlgorithmException, InvalidKeyException {
-        User user = this.database.find_user(ServerUtils.toByteArray(cf));
+        User user = this.database.findUser(ServerUtils.toByteArray(cf));
         if (user == null){
             return "error"; //maybe an exception
         }
-        byte[] userSalt = user.getSale_utente();
+        byte[] userSalt = user.getUserSalt();
         byte[] passwordBytes = password.getBytes();
 
         byte[] passwordConcat = ServerUtils.concatByteArray(userSalt, passwordBytes);
 
         MessageDigest md = MessageDigest.getInstance("SHA-256");
-        byte[] passwordHased = md.digest(passwordConcat);
+        byte[] passwordHashed = md.digest(passwordConcat);
 
-        if (passwordHased == user.getPassword()){
+        if (passwordHashed == user.getPassword()){
             Timestamp now = ServerUtils.getNow();
             int id = user.getId();
-            this.database.update_user(user.getCf(), ServerUtils.getNow(), null, null);
-            AuthToken token = new AuthToken(id);
-            return token.getToken(this.getSalt2());
+            this.database.updateUser(user.getCf(), ServerUtils.getNow(), null, null);
+            AuthToken token = new AuthToken(id, this.getSalt2());
+            return token.getToken();
         }
         return "error";
     }
 
     public boolean register(String cf, String password) throws NoSuchAlgorithmException {
-        /*if (!HealhApi.checkCf(cf)){
+        /* if (!HealhApi.checkCf(cf)){
             return false;
         }*/
         byte[] passwordBytes = password.getBytes();
@@ -91,39 +119,39 @@ public class AppServer {
         MessageDigest md = MessageDigest.getInstance("SHA-256");
         byte[] passwordHashed = md.digest(passwordConcat);
 
-        this.database.add_user(ServerUtils.toByteArray(cf), passwordHashed, userSalt);
+        this.database.addUser(ServerUtils.toByteArray(cf), passwordHashed, userSalt);
 
         return true;
     }
 
     public boolean createReport(int id, int duration, Timestamp date, AuthToken token) throws NoSuchAlgorithmException, InvalidKeyException {
-        if(!token.isValid(this.getSalt2())){
+        if(!token.isValid(id, this.getSalt2())){
             return false;
         }
 
         String payload = token.getPayload();
         String strIdUser = payload.substring(0, payload.indexOf(","));
         int idUser = Integer.parseInt(strIdUser);
-        User user = this.database.find_user(idUser);
+        User user = this.database.findUser(idUser);
         byte[] cfSegnalatore = user.getCf();
-        byte[] cfSegnalato = this.database.find_user(id).getCf();
+        byte[] cfSegnalato = this.database.findUser(id).getCf();
 
 
-        LinkedList<ContactReport> contacts = this.database.search_contactReport_of_users(cfSegnalato, cfSegnalatore);
+        LinkedList<ContactReport> contacts = this.database.searchContactReportOfUsers(cfSegnalato, cfSegnalatore);
 
         //algorithm
         for (ContactReport c: contacts) {
-            if(c.getData_inizio_contatto().before(date)){
+            if(c.getStartContactDate().before(date)){
                 //the contact in the table is longer than new contact advisor
                 LocalDateTime datetime = date.toLocalDateTime();
-                LocalDateTime cDate = c.getData_inizio_contatto().toLocalDateTime().plusSeconds(c.getDurata());
+                LocalDateTime cDate = c.getStartContactDate().toLocalDateTime().plusSeconds(c.getDuration());
 
                 if (datetime.plusSeconds(duration).isBefore(cDate)){
-                    this.database.add_contact(cfSegnalatore, cfSegnalato, duration, date);
+                    this.database.addContact(cfSegnalatore, cfSegnalato, duration, date);
                 } else {
-                    this.database.add_contact(cfSegnalatore, cfSegnalato, c.getDurata(), date);
-                    this.database.remove_contactReport(cfSegnalato, cfSegnalatore, c.getData_inizio_contatto());
-                    this.database.add_contactReport(cfSegnalatore, cfSegnalato, duration, date);
+                    this.database.addContact(cfSegnalatore, cfSegnalato, c.getDuration(), date);
+                    this.database.removeContactReport(cfSegnalato, cfSegnalatore, c.getStartContactDate());
+                    this.database.addContactReport(cfSegnalatore, cfSegnalato, duration, date);
                 }
             }
         }
@@ -132,40 +160,47 @@ public class AppServer {
         return true;
     }
 
-    public LinkedList<NotificationToken> getNotifications(core.tokens.NotificationToken token) throws NoSuchAlgorithmException, InvalidKeyException {
-        if(!token.isValid(this.getSalt1(), this.getSalt2())){
-            return null;
-        }
+    public LinkedList<String> getNotifications(core.tokens.NotificationToken token) throws NoSuchAlgorithmException, InvalidKeyException {
+
         String payload = token.getPayload();
         String strIdUser = payload.substring(0, payload.indexOf(","));
         int idUser = Integer.parseInt(strIdUser);
-        User user = this.database.find_user(idUser);
+        User user = this.database.findUser(idUser);
+        if(!token.isValid(idUser, ServerUtils.toString(user.getCf()), ServerUtils.getNow(), this.getSalt1(), this.getSalt2())){
+            return null;
+        }
+        LinkedList<entities.NotificationToken> dbTokens = this.database.searchUserNotificationTokens(user.getId());
+        LinkedList<String> tokens = new LinkedList<>();
 
-        return this.database.search_notificationTokens_user(user.getId());
+        for (entities.NotificationToken dbToken: dbTokens) {
+            tokens.add(dbToken.getCode());
+        }
+
+        return tokens;
     }
 
     public boolean useNotification(String code){
-        NotificationToken notification = this.database.search_notificationToken(code);
+        entities.NotificationToken notification = this.database.searchNotificationToken(code);
         if (notification == null){
             return false;
         }
-        NotificationToken token = this.database.update_notificationToken(code, ServerUtils.getNow());
+        entities.NotificationToken token = this.database.updateNotificationToken(code, ServerUtils.getNow());
         return true;
     }
 
-    public NotificationToken getNotificationDetails(String code){
-        return this.database.search_notificationToken(code);
+    public String getNotificationDetails(String code){
+        return this.database.searchNotificationToken(code).getCode();
     }
 
     public boolean notifyPositiveUser(String cf) throws NoSuchAlgorithmException, InvalidKeyException {
-        User user = this.database.find_user(ServerUtils.toByteArray(cf));
-        LinkedList<Contact> contacts = this.database.search_contacts_of_user(user.getCf());
+        User user = this.database.findUser(ServerUtils.toByteArray(cf));
+        LinkedList<Contact> contacts = this.database.searchContactsOfUser(user.getCf());
 
         //algorithm
         HashMap durationMap = new HashMap<User, Integer>();
         for (Contact c: contacts) {
-            User user_i = this.database.find_user(c.getId_segnalatore());
-            User user_j = this.database.find_user(c.getId_segnalato());
+            User user_i = this.database.findUser(c.getReporterId());
+            User user_j = this.database.findUser(c.getReportedId());
             LocalDateTime datetime = LocalDateTime.now();
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd H:mm:ss");
 
@@ -173,13 +208,13 @@ public class AppServer {
             datetime=datetime.minusHours(480);
             String afterSubtraction=datetime.format(formatter);
             Timestamp timestampAfterSubtraction = Timestamp.valueOf(afterSubtraction);
-            if (user_i.getData_ultimo_tampone_positivo().after(timestampAfterSubtraction)  &&
-                    c.getData_inizio_contatto().after(user_i.getData_ultimo_tampone_positivo())){
-                durationMap.put(user_i, (Integer)durationMap.get(user_i) + c.getDurata());
+            if (user_i.getLastPositiveSwabDate().after(timestampAfterSubtraction)  &&
+                    c.getStartContactDate().after(user_i.getLastPositiveSwabDate())){
+                durationMap.put(user_i, (Integer)durationMap.get(user_i) + c.getDuration());
             }
-            if (user_j.getData_ultimo_tampone_positivo().after(timestampAfterSubtraction)  &&
-                    c.getData_inizio_contatto().after(user_j.getData_ultimo_tampone_positivo())){
-                durationMap.put(user_j, (Integer)durationMap.get(user_j) + c.getDurata());
+            if (user_j.getLastPositiveSwabDate().after(timestampAfterSubtraction)  &&
+                    c.getStartContactDate().after(user_j.getLastPositiveSwabDate())){
+                durationMap.put(user_j, (Integer)durationMap.get(user_j) + c.getDuration());
             }
 
         }
@@ -188,17 +223,24 @@ public class AppServer {
         durationMap.forEach ((key, value) ->{
             if ((Integer)value > (Integer)15){
                 User u = (User)key;
-                core.tokens.NotificationToken notificationT = new core.tokens.NotificationToken(u.getId(), ServerUtils.toString(u.getCf()),
-                        ServerUtils.getNow());
-                String code = null;
+                NotificationToken notificationT = null;
                 try {
-                    code = notificationT.getToken(this.getSalt1(), this.getSalt2());
+                    notificationT = new NotificationToken(u.getId(), ServerUtils.toString(u.getCf()),
+                            ServerUtils.getNow(), this.getSalt1(), this.getSalt2());
                 } catch (NoSuchAlgorithmException e) {
                     e.printStackTrace();
                 } catch (InvalidKeyException e) {
                     e.printStackTrace();
                 }
-                this.database.add_notificationToken(code, u.getId());
+                String code = null;
+                try {
+                    code = notificationT.getToken();
+                } catch (NoSuchAlgorithmException e) {
+                    e.printStackTrace();
+                } catch (InvalidKeyException e) {
+                    e.printStackTrace();
+                }
+                this.database.addNotificationToken(code, u.getId());
             }
         });
 

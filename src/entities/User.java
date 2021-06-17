@@ -17,31 +17,31 @@ public class User implements Comparable {
     private final byte[] cf;
     private final int id;
     private byte[] password;
-    private byte[] sale_utente;
-    private Timestamp data_ultimo_login;
-    private Timestamp data_ultimo_tampone_positivo;
-    private Timestamp data_creazione_ultimo_tampone;
+    private byte[] userSalt;
+    private Timestamp lastLoginDate;
+    private Timestamp lastPositiveSwabDate;
+    private Timestamp lastSwabCreationDate;
 
-    public User(byte[] cf,byte[] password,byte[] sale_utente) {
+    public User(byte[] cf,byte[] password,byte[] userSalt) {
         this.cf = cf;
         this.id = count++;
         this.password = password;
-        this.sale_utente = sale_utente;
-        this.data_ultimo_login = null;
-        this.data_creazione_ultimo_tampone = null;
-        this.data_ultimo_tampone_positivo = null;
+        this.userSalt = userSalt;
+        this.lastLoginDate = null;
+        this.lastSwabCreationDate = null;
+        this.lastPositiveSwabDate = null;
     }
 
-    public User(byte[] cf,byte[] password,byte[] sale_utente,
-                Timestamp data_ultimo_login, Timestamp data_creazione_ultimo_tampone,
-                Timestamp data_ultimo_tampone_positivo) {
+    public User(byte[] cf,byte[] password,byte[] userSalt,
+                Timestamp lastLoginDate, Timestamp lastSwabCreationDate,
+                Timestamp lastPositiveSwabDate) {
         this.cf = cf;
         this.id = count++;
         this.password = password;
-        this.sale_utente = sale_utente;
-        this.data_ultimo_login = data_ultimo_login;
-        this.data_creazione_ultimo_tampone = data_creazione_ultimo_tampone;
-        this.data_ultimo_tampone_positivo = data_ultimo_tampone_positivo;
+        this.userSalt = userSalt;
+        this.lastLoginDate = lastLoginDate;
+        this.lastSwabCreationDate = lastSwabCreationDate;
+        this.lastPositiveSwabDate = lastPositiveSwabDate;
     }
 
     public byte[] getCf() {
@@ -60,36 +60,36 @@ public class User implements Comparable {
         this.password = password;
     }
 
-    public byte[] getSale_utente() {
-        return sale_utente;
+    public byte[] getUserSalt() {
+        return userSalt;
     }
 
-    public void setSale_utente(byte[] sale_utente) {
-        this.sale_utente = sale_utente;
+    public void setUserSalt(byte[] userSalt) {
+        this.userSalt = userSalt;
     }
 
-    public Timestamp getData_ultimo_login() {
-        return data_ultimo_login;
+    public Timestamp getLastLoginDate() {
+        return lastLoginDate;
     }
 
-    public void setData_ultimo_login(Timestamp data_ultimo_login) {
-        this.data_ultimo_login = data_ultimo_login;
+    public void setLastLoginDate(Timestamp lastLoginDate) {
+        this.lastLoginDate = lastLoginDate;
     }
 
-    public Timestamp getData_ultimo_tampone_positivo() {
-        return data_ultimo_tampone_positivo;
+    public Timestamp getLastPositiveSwabDate() {
+        return lastPositiveSwabDate;
     }
 
-    public void setData_ultimo_tampone_positivo(Timestamp data_ultimo_tampone_positivo) {
-        this.data_ultimo_tampone_positivo = data_ultimo_tampone_positivo;
+    public void setLastPositiveSwabDate(Timestamp lastPositiveSwabDate) {
+        this.lastPositiveSwabDate = lastPositiveSwabDate;
     }
 
-    public Timestamp getData_creazione_ultimo_tampone() {
-        return data_creazione_ultimo_tampone;
+    public Timestamp getLastSwabCreationDate() {
+        return lastSwabCreationDate;
     }
 
-    public void setData_creazione_ultimo_tampone(Timestamp data_creazione_ultimo_tampone) {
-        this.data_creazione_ultimo_tampone = data_creazione_ultimo_tampone;
+    public void setLastSwabCreationDate(Timestamp lastSwabCreationDate) {
+        this.lastSwabCreationDate = lastSwabCreationDate;
     }
 
 
@@ -98,7 +98,7 @@ public class User implements Comparable {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         User user = (User) o;
-        return id == user.id && Arrays.equals(cf, user.cf) && Arrays.equals(password, user.password) && Arrays.equals(sale_utente, user.sale_utente) && Objects.equals(data_ultimo_login, user.data_ultimo_login) && Objects.equals(data_ultimo_tampone_positivo, user.data_ultimo_tampone_positivo) && Objects.equals(data_creazione_ultimo_tampone, user.data_creazione_ultimo_tampone);
+        return id == user.id && Arrays.equals(cf, user.cf) && Arrays.equals(password, user.password) && Arrays.equals(userSalt, user.userSalt) && Objects.equals(lastLoginDate, user.lastLoginDate) && Objects.equals(lastPositiveSwabDate, user.lastPositiveSwabDate) && Objects.equals(lastSwabCreationDate, user.lastSwabCreationDate);
     }
 
 

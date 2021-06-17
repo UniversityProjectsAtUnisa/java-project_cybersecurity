@@ -16,4 +16,22 @@ public class BluetoothScan {
     public double getDistance() {
         return distance;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        BluetoothScan that = (BluetoothScan) o;
+        return id == that.id;
+    }
+
+    @Override
+    public int hashCode() {
+        return id;
+    }
+
+    @Override
+    public String toString() {
+        return "BluetoothScan{id=" + id + ", distance=" + distance + '}';
+    }
 }

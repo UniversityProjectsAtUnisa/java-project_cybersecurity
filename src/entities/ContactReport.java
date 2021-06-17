@@ -13,33 +13,33 @@ import java.util.Arrays;
  * @author marco
  */
 public class ContactReport implements  Comparable{
-    private final byte[] id_segnalatore;
-    private final byte[] id_segnalato;
-    private final int durata;
-    private final Timestamp data_inizio_contatto;
+    private final byte[] reporterId;
+    private final byte[] reportedId;
+    private final int duration;
+    private final Timestamp startContactDate;
 
 
-    public ContactReport(byte[] id_segnalatore, byte[] id_segnalato, int durata, Timestamp data_inizio_contatto) {
-        this.id_segnalatore = id_segnalatore;
-        this.id_segnalato = id_segnalato;
-        this.durata = durata;
-        this.data_inizio_contatto = data_inizio_contatto;
+    public ContactReport(byte[] reporterId, byte[] reportedId, int duration, Timestamp startContactDate) {
+        this.reporterId = reporterId;
+        this.reportedId = reportedId;
+        this.duration = duration;
+        this.startContactDate = startContactDate;
     }
 
-    public Timestamp getData_inizio_contatto() {
-        return data_inizio_contatto;
+    public Timestamp getStartContactDate() {
+        return startContactDate;
     }
 
-    public int getDurata() {
-        return durata;
+    public int getDuration() {
+        return duration;
     }
 
-    public byte[] getId_segnalato() {
-        return id_segnalato;
+    public byte[] getReportedId() {
+        return reportedId;
     }
 
-    public byte[] getId_segnalatore() {
-        return id_segnalatore;
+    public byte[] getReporterId() {
+        return reporterId;
     }
 
     @Override
@@ -47,7 +47,7 @@ public class ContactReport implements  Comparable{
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ContactReport that = (ContactReport) o;
-        return durata == that.durata && Arrays.equals(id_segnalatore, that.id_segnalatore) && Arrays.equals(id_segnalato, that.id_segnalato) && data_inizio_contatto.equals(that.data_inizio_contatto);
+        return duration == that.duration && Arrays.equals(reporterId, that.reporterId) && Arrays.equals(reportedId, that.reportedId) && startContactDate.equals(that.startContactDate);
     }
 
     @Override
@@ -56,7 +56,7 @@ public class ContactReport implements  Comparable{
         if(this == contactReport){
             return 0;
         }else{
-            return this.getData_inizio_contatto().compareTo(contactReport.data_inizio_contatto);
+            return this.getStartContactDate().compareTo(contactReport.startContactDate);
         }
     }
 }
