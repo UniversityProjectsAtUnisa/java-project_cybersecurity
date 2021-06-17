@@ -1,6 +1,8 @@
-package src.AppClient;
+package entities;
 
-public class Credentials {
+import java.io.Serializable;
+
+public class Credentials implements Serializable {
     private final String cf;
     private final String password;
 
