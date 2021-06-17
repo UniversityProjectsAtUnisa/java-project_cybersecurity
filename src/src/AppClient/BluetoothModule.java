@@ -7,7 +7,11 @@ import java.util.Set;
 
 public class BluetoothModule {
     private static final double MAX_BLUETOOTH_DISTANCE = 12.0;
-    private static final int MAX_SCAN_AMOUNT = 3;
+    private final int maxRandomUsers;
+
+    public BluetoothModule() {
+        maxRandomUsers = Math.min(10, Config.CLIENT_COUNT);
+    }
 
     /**
      * Simulated non blocking bluetooth broadcast
@@ -18,7 +22,7 @@ public class BluetoothModule {
      * Simulated blocking bluetooth broadcast
      */
     public BluetoothScan[] scan(int excludeId) {  // TODO: enhance logic
-        int amt = (int) ((Math.random() * (MAX_SCAN_AMOUNT - 1)) + 1);
+        int amt = (int) ((Math.random() * (maxRandomUsers - 1)) + 1);
         BluetoothScan[] res = new BluetoothScan[amt];
         Integer[] ids = getUniqueIds(amt, excludeId);
         for (int i = 0; i < amt; i++) {
