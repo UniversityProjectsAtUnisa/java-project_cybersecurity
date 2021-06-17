@@ -22,6 +22,10 @@ public class Request<T extends Serializable> implements Serializable {
     public T getPayload() {
         return payload;
     }
+    
+    public AuthToken getToken() {
+        return token;
+    }
 
     public static <T extends Serializable> Request<T> make(String endpointName, T payload, AuthToken token) {
         return new Request<>(endpointName, payload, token);

@@ -1,4 +1,5 @@
 package src.AppServer;
+
 import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -18,78 +19,102 @@ import core.tokens.*;
 import entities.Contact;
 import entities.ContactReport;
 import entities.User;
+import entities.Notification;
+import java.io.Serializable;
 import utils.Config;
 
 import javax.crypto.SecretKey;
+import javax.naming.AuthenticationException;
 import javax.xml.crypto.Data;
+import utils.ContactReportMessage;
+import utils.Credentials;
 
 /**
  *
- * Endpoints:
- * Login
- *      login({codice_fiscale, password}) -> token
- * Registrazione
- *      register({codice_fiscale, password}) -> boolean
- * Segnalazione contatto
- *      createReport({id2, duration, data}, token) -> boolean
- * Richiesta notifiche
- *      getNotifications(token) -> Notification[]
- * Verifica e Disabilita codice tampone gratuito
- *      useNotification({code}) -> boolean
- * Richiesta informazioni codice tampone gratuito
- *      getNotificationDetails({code}, token) -> NotificationDetail
- * Tampone con risultato positivo dall’HA
- *      notifyPositiveUser({codice_fiscale}) -> boolean
+ * Endpoints: Login login({codice_fiscale, password}) -> token Registrazione
+ * register({codice_fiscale, password}) -> boolean Segnalazione contatto
+ * createReport({id2, duration, data}, token) -> boolean Richiesta notifiche
+ * getNotifications(token) -> Notification[] Verifica e Disabilita codice
+ * tampone gratuito useNotification({code}) -> boolean Richiesta informazioni
+ * codice tampone gratuito getNotificationDetails({code}, token) ->
+ * NotificationDetail Tampone con risultato positivo dall’HA
+ * notifyPositiveUser({codice_fiscale}) -> boolean
  *
  */
-
 public class AppServer {
 
     private String salt1 = "";
     private String salt2 = "";
-    private Database database;
+    private final Database database;
 
     public AppServer() {
         this.database = new Database();
-        SecretKey key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks","changeit","salt1");
+        SecretKey key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "salt1");
         this.salt1 = ServerUtils.toString(key1.getEncoded());
-        SecretKey key2 = ServerUtils.loadFromKeyStore("./salts_keystore.jks","changeit","salt2");
+        SecretKey key2 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "salt2");
         this.salt2 = ServerUtils.toString(key2.getEncoded());
     }
 
-/*
-    public <T> void handleRequest(Request req){
-        <V> payload = req.getPayload();
-        <T> response;
-        switch(req.getName()){
-            case 'login':
-                response = this.login(payload.getCf(), payload.getPassword());
-                break;
-            case 'register':
-                response = this.register(payload.getCf(), payload.getPassword());
-                break;
-            case 'createReport':
-                response = this.createReport(payload.getId(), payload.getDuration(), payload.getDate(), payload.getToken());
-                break;
-            case 'getNotifications':
-                response = this.getNotifications(payload.getToken());
-                break;
-            case 'useNotifications':
-                response = this.useNotification(payload.getCode());
-                break;
-            case 'getNotificationsDetails':
-                response = this.getNotificationsDetails(payload.getCode());
-                break;
-            case 'notifyPositiveUser':
-                response = this.notifyPositiveUser(payload.getCf());
-                break;
+    public Response handleRequest(Request req) {
+        // UseNotification è chiamato dall'HA
+        // TUtte le chiamate sono autenticate tranne login e register
+        // Nel server dell'HA c'è notifyPositiveUser e useNotification
+        // Nomi endpoint tutti maiuscoli
+        String endpointName = req.getEndpointName();
+
+        User loggedUser = null;
+        try {
+            if (!endpointName.equals("LOGIN") && !endpointName.equals("REGISTER")) {
+                AuthToken token = req.getToken();
+                if (token == null) {
+                    throw new AuthenticationException("The authentication token is not valid");
+                }
+                Timestamp lastLoginDate = this.database.findUser(token.getId()).getLastLoginDate();
+                if (!token.isValid(lastLoginDate, this.getSalt2())) {
+                    throw new AuthenticationException("The authentication token is not valid");
+                }
+                loggedUser = this.database.findUser(token.getId());
+            }
+
+            Serializable data = "Internal server error";
+            switch (req.getEndpointName()) {
+                case "login":
+                    Credentials loginData = (Credentials) req.getPayload();
+                    data = this.login(loginData.getCf(), loginData.getPassword());
+                    break;
+                case "register":
+                    Credentials registerData = (Credentials) req.getPayload();
+                    data = this.register(registerData.getCf(), registerData.getPassword());
+                    break;
+                case "createReport":
+                    ContactReportMessage createReportData = (ContactReportMessage) req.getPayload();
+                    data = this.createReport(createReportData.getIdUserToReport(), createReportData.getDuration(), createReportData.getStartDateTime(), loggedUser);
+                    break;
+                case "getNotifications":
+                    data = this.getNotifications(loggedUser);
+                    break;
+                case "getNotificationSuspensionDate":
+                    String code = (String) req.getPayload();
+                    data = this.getNotificationSuspensionDate(code, loggedUser);
+                    break;
+//                case "notifyPositiveUser":
+//                    response = this.notifyPositiveUser(payload.getCf());
+//                    break;
+//                case "useNotification":
+//                    response = this.useNotification(payload.getCode());
+//                    break;
+            }
+            return Response.make(data);
+        } catch (AuthenticationException e) {
+            return Response.make(e.getMessage());
+        } catch (Exception e) {
+            return Response.make("Internal server error");
         }
-        return response;
     }
-*/
+
     public AuthToken login(String cf, String password) throws NoSuchAlgorithmException, InvalidKeyException {
         User user = this.database.findUser(ServerUtils.toByteArray(cf));
-        if (user == null){
+        if (user == null) {
             return null;
         }
         byte[] userSalt = user.getUserSalt();
@@ -99,8 +124,7 @@ public class AppServer {
 
         MessageDigest md = MessageDigest.getInstance("SHA-256");
         byte[] passwordHashed = md.digest(passwordConcat);
-        if (Arrays.equals(passwordHashed, user.getPassword())){
-            Timestamp now = ServerUtils.getNow();
+        if (Arrays.equals(passwordHashed, user.getPassword())) {
             int id = user.getId();
             this.database.updateUser(user.getCf(), ServerUtils.getNow(), null, null);
             AuthToken token = new AuthToken(id, this.getSalt2());
@@ -126,40 +150,30 @@ public class AppServer {
         return true;
     }
 
-    public boolean createReport(int id, int duration, Timestamp date, AuthToken token) throws NoSuchAlgorithmException, InvalidKeyException {
-        if(!token.isValid(token.getId(), token.getCreatedAt(), this.getSalt2())){
-            return false;
-        }
-        System.out.println("crea il report");
-        int idUser = token.getId();
-        User user = this.database.findUser(idUser);
-        byte[] cfReporter = user.getCf();
+    public boolean createReport(int id, int duration, Timestamp date, User loggedUser) throws NoSuchAlgorithmException, InvalidKeyException {
+
+        byte[] cfReporter = loggedUser.getCf();
         byte[] cfReported = this.database.findUser(id).getCf();
 
-        LinkedList<ContactReport> reports = this.database.searchContactReportOfReported(cfReporter);
-        System.out.println("\n"+reports.size()+"\n");
+        List<ContactReport> reports = this.database.searchContactReportOfReported(cfReporter);
 
-        reports.forEach((c) -> {
-            System.out.println("reportedId" + c.getReportedId());
-        });
-
-        if (reports.size() == 0){
+        if (reports.isEmpty()) {
             this.database.addContactReport(cfReporter, cfReported, duration, date);
             return true;
         }
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd H:mm:ss");
-        Timestamp cEndDateMax =  new Timestamp(0);
+        Timestamp cEndDateMax = new Timestamp(0);
 
         LocalDateTime reportEndDate = date.toLocalDateTime().plusSeconds(duration);
         String strReportEndDate = reportEndDate.format(formatter);
         Timestamp timestampReportEndDate = Timestamp.valueOf(strReportEndDate);
         //algorithm
-        for (ContactReport c: reports) {
+        for (ContactReport c : reports) {
             LocalDateTime datetime = c.getStartContactDate().toLocalDateTime();
 
-            datetime=datetime.minusMinutes(15);
-            String afterSubtraction=datetime.format(formatter);
+            datetime = datetime.minusMinutes(15);
+            String afterSubtraction = datetime.format(formatter);
             Timestamp timestampAfterSubtraction = Timestamp.valueOf(afterSubtraction);
 
             LocalDateTime cEndDate = c.getStartContactDate().toLocalDateTime().plusSeconds(c.getDuration());
@@ -168,15 +182,11 @@ public class AppServer {
 
             cEndDateMax = ServerUtils.maxTimestamp(cEndDateMax, timestampCEndDate);
 
-            if((!c.getStartContactDate().after(date) && !date.after(timestampCEndDate) ||
-                    !c.getStartContactDate().before(date) && !timestampReportEndDate.before(c.getStartContactDate())) &&
-                    !c.getStartContactDate().before(timestampAfterSubtraction)){
+            if ((!c.getStartContactDate().after(date) && !date.after(timestampCEndDate)
+                    || !c.getStartContactDate().before(date) && !timestampReportEndDate.before(c.getStartContactDate()))
+                    && !c.getStartContactDate().before(timestampAfterSubtraction)) {
 
-                System.out.println("la data viene prim senza aggiungere la durata");
-
-                LocalDateTime cDate = c.getStartContactDate().toLocalDateTime().plusSeconds(c.getDuration());
-
-                if (timestampReportEndDate.after(timestampCEndDate)){
+                if (timestampReportEndDate.after(timestampCEndDate)) {
                     this.database.removeContactReport(cfReported, cfReporter, c.getStartContactDate());
                 }
 
@@ -184,110 +194,91 @@ public class AppServer {
                 Timestamp minEnd = ServerUtils.minTimestamp(timestampReportEndDate, timestampCEndDate);
                 int durationNewContact = ServerUtils.diffTimestampSec(minEnd, maxInit);
 
-                System.out.println("init: "+maxInit.toString()+ ", end:"+minEnd.toString()+", duration:" + durationNewContact);
-
                 this.database.addContact(cfReporter, cfReported, durationNewContact, maxInit);
 
-            }else{
-                System.out.println("la data viene dopo senza aggiungere la durata");
             }
         }
         if (!timestampReportEndDate.before(cEndDateMax)) {
             this.database.addContactReport(cfReporter, cfReported, duration, date);
         }
-        //end algorithm
 
         return true;
     }
 
-    public LinkedList<String> getNotifications(core.tokens.NotificationToken token) throws NoSuchAlgorithmException, InvalidKeyException {
-
-        String payload = token.getPayload();
-        String strIdUser = payload.substring(0, payload.indexOf(","));
-        int idUser = Integer.parseInt(strIdUser);
-        User user = this.database.findUser(idUser);
-        if(!token.isValid(idUser, ServerUtils.toString(user.getCf()), ServerUtils.getNow(), this.getSalt1(), this.getSalt2())){
-            return null;
-        }
-        LinkedList<entities.NotificationToken> dbTokens = this.database.searchUserNotificationTokens(user.getId());
+    public LinkedList<String> getNotifications(User loggedUser) throws NoSuchAlgorithmException, InvalidKeyException {
+        List<Notification> dbTokens = this.database.searchUserNotifications(loggedUser.getId());
         LinkedList<String> tokens = new LinkedList<>();
 
-        for (entities.NotificationToken dbToken: dbTokens) {
+        for (Notification dbToken : dbTokens) {
             tokens.add(dbToken.getCode());
         }
 
         return tokens;
     }
 
-    public boolean useNotification(String code){
-        entities.NotificationToken notification = this.database.searchNotificationToken(code);
-        if (notification == null){
+    public boolean useNotification(String code) {
+        Notification notification = this.database.searchNotification(code);
+        if (notification == null) {
             return false;
         }
-        entities.NotificationToken token = this.database.updateNotificationToken(code, ServerUtils.getNow());
-        return true;
+        return this.database.updateNotification(code, ServerUtils.getNow()) != null;
     }
 
-    public entities.NotificationToken getNotificationDetails(String code){
-        return this.database.searchNotificationToken(code);
+    public Timestamp getNotificationSuspensionDate(String code, User loggedUser) throws AuthenticationException {
+        Notification notification =  this.database.searchNotification(code);
+        if(notification.getId() != loggedUser.getId()){
+            throw new AuthenticationException("The logged user does not own the selected notificationToken");
+        }
+        return notification.getSuspensionDate();
     }
 
     public boolean notifyPositiveUser(String cf) throws NoSuchAlgorithmException, InvalidKeyException {
         User user = this.database.findUser(ServerUtils.toByteArray(cf));
-        LinkedList<Contact> contacts = this.database.searchContactsOfUser(user.getCf());
+        List<Contact> contacts = this.database.searchContactsOfUser(user.getCf());
         user.setLastPositiveSwabDate(ServerUtils.getNow());
         this.database.updateUser(user.getCf(), null, null, ServerUtils.getNow());
 
         //algorithm
         Map<User, Integer> durationMap = new HashMap<>();
-        for (Contact c: contacts) {
+        for (Contact c : contacts) {
             User user_i = this.database.findUser(c.getReporterId());
             User user_j = this.database.findUser(c.getReportedId());
             LocalDateTime datetime = LocalDateTime.now();
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd H:mm:ss");
 
-
-            datetime=datetime.minusHours(480);
-            String afterSubtraction=datetime.format(formatter);
+            datetime = datetime.minusHours(480);
+            String afterSubtraction = datetime.format(formatter);
             Timestamp timestampAfterSubtraction = Timestamp.valueOf(afterSubtraction);
-            if (user_i.getLastPositiveSwabDate() != null &&
-                    (user_i.getLastPositiveSwabDate().after(timestampAfterSubtraction)  ||
-                    c.getStartContactDate().after(user_i.getLastPositiveSwabDate()))){
-                int prevValue = durationMap.get(user_j) == null ? 0 : (Integer)durationMap.get(user_j);
-                durationMap.put(user_j, (Integer)prevValue + c.getDuration());
+            if (user_i.getLastPositiveSwabDate() != null
+                    && (user_i.getLastPositiveSwabDate().after(timestampAfterSubtraction)
+                    || c.getStartContactDate().after(user_i.getLastPositiveSwabDate()))) {
+                int prevValue = durationMap.get(user_j) == null ? 0 : durationMap.get(user_j);
+                durationMap.put(user_j, (Integer) prevValue + c.getDuration());
             }
-            if (user_j.getLastPositiveSwabDate() != null &&
-                    (user_j.getLastPositiveSwabDate().after(timestampAfterSubtraction)  ||
-                    c.getStartContactDate().after(user_j.getLastPositiveSwabDate()))){
-                int prevValue = durationMap.get(user_i) == null ? 0 : (Integer)durationMap.get(user_i);
-                durationMap.put(user_i, (Integer)prevValue + c.getDuration());
+            if (user_j.getLastPositiveSwabDate() != null
+                    && (user_j.getLastPositiveSwabDate().after(timestampAfterSubtraction)
+                    || c.getStartContactDate().after(user_j.getLastPositiveSwabDate()))) {
+                int prevValue = durationMap.get(user_i) == null ? 0 : durationMap.get(user_i);
+                durationMap.put(user_i, (Integer) prevValue + c.getDuration());
             }
 
         }
         //end algorithm
-        for (Map.Entry<User,Integer> entry : durationMap.entrySet()){
+        for (Map.Entry<User, Integer> entry : durationMap.entrySet()) {
             int value = entry.getValue();
             User u = entry.getKey();
-            if ((Integer)value > (Integer)15){
-                NotificationToken notificationT = null;
+            if (value > Config.RISK_MINUTES) {
+                NotificationToken token = null;
                 try {
-                    notificationT = new NotificationToken(u.getId(), ServerUtils.toString(u.getCf()),
-                            ServerUtils.getNow(), this.getSalt1(), this.getSalt2());
-                } catch (NoSuchAlgorithmException e) {
-                    e.printStackTrace();
-                } catch (InvalidKeyException e) {
+                    Timestamp expireDate = Timestamp.valueOf(ServerUtils.getNow().toLocalDateTime().plusDays(Config.EXPIRE_DAYS));
+                    token = new NotificationToken(u.getId(), expireDate, ServerUtils.toString(u.getCf()),
+                            this.getSalt1(), this.getSalt2());
+                    String code = token.getCode();
+                    this.database.addNotification(code, u.getId());
+                    this.database.updateUser(u.getCf(), null, ServerUtils.getNow(), null);
+                } catch (NoSuchAlgorithmException | InvalidKeyException e) {
                     e.printStackTrace();
                 }
-                String code = null;
-                try {
-                    code = notificationT.getToken();
-                } catch (NoSuchAlgorithmException e) {
-                    e.printStackTrace();
-                } catch (InvalidKeyException e) {
-                    e.printStackTrace();
-                }
-                this.database.addNotificationToken(code, u.getId());
-                this.database.updateUser(u.getCf(), null, ServerUtils.getNow(), null);
             }
         }
 

@@ -7,6 +7,7 @@ import utils.ContactReportMessage;
 import utils.Credentials;
 import entities.Notification;
 import utils.Config;
+import java.sql.Timestamp;
 
 import java.time.LocalDateTime;
 
@@ -28,7 +29,7 @@ public class ServerApiService {
         return (AuthToken) res.getPayload();
     }
 
-    public void reportContact(int id, int duration, LocalDateTime startDate, AuthToken token) {
+    public void reportContact(int id, int duration, Timestamp startDate, AuthToken token) {
         client.sendRequest("REPORT_CONTACT", new ContactReportMessage(id, duration, startDate), token);
     }
 

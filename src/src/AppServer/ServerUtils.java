@@ -7,6 +7,8 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.Time;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -65,6 +67,11 @@ public class ServerUtils {
             pos++;
         }
         return concatArr;
+    }
+    
+    public static byte[] encryptWithSalt(byte[] data, byte[] salt) throws NoSuchAlgorithmException{
+        byte[] concatenation = concatByteArray(salt, data);
+        return MessageDigest.getInstance("SHA-256").digest(concatenation);
     }
 
     public static boolean fileWrite(String path, String content) throws IOException {

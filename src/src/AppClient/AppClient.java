@@ -4,22 +4,23 @@ import apis.ServerApiService;
 import core.tokens.AuthToken;
 import utils.Credentials;
 import entities.Notification;
+import java.sql.Timestamp;
 import utils.AppTimer;
 import utils.Config;
-
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.logging.Logger;
+import src.AppServer.ServerUtils;
 
 public class AppClient {
     private static final double MAX_DISTANCE = 2.0;
 
     private static class ContactCounter {
         private int count = 1;
-        private final LocalDateTime startDate;
+        private final Timestamp startDate;
 
         public ContactCounter() {
-            startDate = LocalDateTime.now();
+            startDate = ServerUtils.getNow();
         }
 
         public void increment() {
