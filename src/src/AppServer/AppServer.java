@@ -18,7 +18,6 @@ import core.tokens.*;
 import entities.Contact;
 import entities.ContactReport;
 import entities.User;
-import entities.NotificationToken;
 
 import javax.crypto.SecretKey;
 
@@ -55,7 +54,36 @@ public class AppServer {
         SecretKey key2 = ServerUtils.loadFromKeyStore("./salts_keystore.jks","changeit","salt2");
         this.salt2 = ServerUtils.toString(key2.getEncoded());
     }
-
+/*
+    public <T> void handleRequest(Request req){
+        <V> payload = req.getPayload();
+        <T> response;
+        switch(req.getName()){
+            case 'login':
+                response = this.login(payload.getCf(), payload.getPassword());
+                break;
+            case 'register':
+                response = this.register(payload.getCf(), payload.getPassword());
+                break;
+            case 'createReport':
+                response = this.createReport(payload.getId(), payload.getDuration(), payload.getDate(), payload.getToken());
+                break;
+            case 'getNotifications':
+                response = this.getNotifications(payload.getToken());
+                break;
+            case 'useNotifications':
+                response = this.useNotification(payload.getCode());
+                break;
+            case 'getNotificationsDetails':
+                response = this.getNotificationsDetails(payload.getCode());
+                break;
+            case 'notifyPositiveUser':
+                response = this.notifyPositiveUser(payload.getCf());
+                break;
+        }
+        return response;
+    }
+*/
     public String login(String cf, String password) throws NoSuchAlgorithmException, InvalidKeyException {
         User user = this.database.find_user(ServerUtils.toByteArray(cf));
         if (user == null){
@@ -67,20 +95,20 @@ public class AppServer {
         byte[] passwordConcat = ServerUtils.concatByteArray(userSalt, passwordBytes);
 
         MessageDigest md = MessageDigest.getInstance("SHA-256");
-        byte[] passwordHased = md.digest(passwordConcat);
+        byte[] passwordHashed = md.digest(passwordConcat);
 
-        if (passwordHased == user.getPassword()){
+        if (passwordHashed == user.getPassword()){
             Timestamp now = ServerUtils.getNow();
             int id = user.getId();
             this.database.update_user(user.getCf(), ServerUtils.getNow(), null, null);
-            AuthToken token = new AuthToken(id);
-            return token.getToken(this.getSalt2());
+            AuthToken token = new AuthToken(id, this.getSalt2());
+            return token.getToken();
         }
         return "error";
     }
 
     public boolean register(String cf, String password) throws NoSuchAlgorithmException {
-        /*if (!HealhApi.checkCf(cf)){
+        /* if (!HealhApi.checkCf(cf)){
             return false;
         }*/
         byte[] passwordBytes = password.getBytes();
@@ -97,7 +125,7 @@ public class AppServer {
     }
 
     public boolean createReport(int id, int duration, Timestamp date, AuthToken token) throws NoSuchAlgorithmException, InvalidKeyException {
-        if(!token.isValid(this.getSalt2())){
+        if(!token.isValid(id, this.getSalt2())){
             return false;
         }
 
@@ -132,29 +160,36 @@ public class AppServer {
         return true;
     }
 
-    public LinkedList<NotificationToken> getNotifications(core.tokens.NotificationToken token) throws NoSuchAlgorithmException, InvalidKeyException {
-        if(!token.isValid(this.getSalt1(), this.getSalt2())){
-            return null;
-        }
+    public LinkedList<String> getNotifications(core.tokens.NotificationToken token) throws NoSuchAlgorithmException, InvalidKeyException {
+
         String payload = token.getPayload();
         String strIdUser = payload.substring(0, payload.indexOf(","));
         int idUser = Integer.parseInt(strIdUser);
         User user = this.database.find_user(idUser);
+        if(!token.isValid(idUser, ServerUtils.toString(user.getCf()), ServerUtils.getNow(), this.getSalt1(), this.getSalt2())){
+            return null;
+        }
+        LinkedList<entities.NotificationToken> dbTokens = this.database.search_notificationTokens_user(user.getId());
+        LinkedList<String> tokens = new LinkedList<>();
 
-        return this.database.search_notificationTokens_user(user.getId());
+        for (entities.NotificationToken dbToken: dbTokens) {
+            tokens.add(dbToken.getCodice());
+        }
+
+        return tokens;
     }
 
     public boolean useNotification(String code){
-        NotificationToken notification = this.database.search_notificationToken(code);
+        entities.NotificationToken notification = this.database.search_notificationToken(code);
         if (notification == null){
             return false;
         }
-        NotificationToken token = this.database.update_notificationToken(code, ServerUtils.getNow());
+        entities.NotificationToken token = this.database.update_notificationToken(code, ServerUtils.getNow());
         return true;
     }
 
-    public NotificationToken getNotificationDetails(String code){
-        return this.database.search_notificationToken(code);
+    public String getNotificationDetails(String code){
+        return this.database.search_notificationToken(code).getCodice();
     }
 
     public boolean notifyPositiveUser(String cf) throws NoSuchAlgorithmException, InvalidKeyException {
@@ -188,11 +223,18 @@ public class AppServer {
         durationMap.forEach ((key, value) ->{
             if ((Integer)value > (Integer)15){
                 User u = (User)key;
-                core.tokens.NotificationToken notificationT = new core.tokens.NotificationToken(u.getId(), ServerUtils.toString(u.getCf()),
-                        ServerUtils.getNow());
+                NotificationToken notificationT = null;
+                try {
+                    notificationT = new NotificationToken(u.getId(), ServerUtils.toString(u.getCf()),
+                            ServerUtils.getNow(), this.getSalt1(), this.getSalt2());
+                } catch (NoSuchAlgorithmException e) {
+                    e.printStackTrace();
+                } catch (InvalidKeyException e) {
+                    e.printStackTrace();
+                }
                 String code = null;
                 try {
-                    code = notificationT.getToken(this.getSalt1(), this.getSalt2());
+                    code = notificationT.getToken();
                 } catch (NoSuchAlgorithmException e) {
                     e.printStackTrace();
                 } catch (InvalidKeyException e) {
