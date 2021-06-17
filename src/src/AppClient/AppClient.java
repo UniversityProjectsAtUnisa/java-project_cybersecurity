@@ -7,7 +7,6 @@ import entities.Notification;
 import java.sql.Timestamp;
 import utils.AppTimer;
 import utils.Config;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.logging.Logger;
 import src.AppServer.ServerUtils;
@@ -34,20 +33,24 @@ public class AppClient {
     private final ServerApiService serverApi = new ServerApiService();
     private AuthToken token;
     private final Timer notificationTimer = new Timer();
+    private Credentials tmpCredentials;
+
+    private Credentials getTmpCredentials() {
+        if (tmpCredentials == null) tmpCredentials = FakeInput.getNextCredential();
+        return tmpCredentials;
+    }
 
     public boolean register() {
-        Credentials c = FakeInput.getNextCredential();
-        return serverApi.register(c);
+        return serverApi.register(getTmpCredentials());
     }
 
     public boolean login() {
-        Credentials c = FakeInput.getNextCredential();
-        token = serverApi.login(c);
+        token = serverApi.login(getTmpCredentials());
         if (token == null)
             return false;
         appState = AppClientState.LOGGED;
         AppTimer.getInstance().subscribe(this);
-        startNotificationTimer();
+        // startNotificationTimer();
         return true;
     }
 
@@ -64,8 +67,9 @@ public class AppClient {
     }
 
     public void fetchNotifications() {
-        Notification[] notifications = serverApi.getNotifications(token);
-        String log = String.format("User(%d) Notifications: %s", token.getId(), Arrays.toString(notifications));
+        if (appState != AppClientState.LOGGED) throw new RuntimeException();
+        List<Notification> notifications = serverApi.getNotifications(token);
+        String log = String.format("User(%d) Notifications: %s", token.getId(), notifications);
         Logger.getGlobal().info(log);
     }
 

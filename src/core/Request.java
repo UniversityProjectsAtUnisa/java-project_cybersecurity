@@ -33,6 +33,6 @@ public class Request<T extends Serializable> implements Serializable {
 
     @Override
     public String toString() {
-        return "Request: {endpointName: " + getEndpointName() + " payload: " + getPayload().toString() + "}";
+        return "Request: {endpointName: " + getEndpointName() + " payload: " + getPayload() + "}";
     }
 }

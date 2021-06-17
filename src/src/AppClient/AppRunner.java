@@ -17,7 +17,10 @@ public class AppRunner {
 
         Logger.getGlobal().info("STARTING LOGIN PHASE");
         for (AppClient client: clients) {
-            client.login();
+            boolean success = client.register();
+            if (!success) throw new RuntimeException("Register Failed!");
+            success = client.login();
+            if (!success) throw new RuntimeException("Login Failed!");
         }
         Logger.getGlobal().info("LOGIN PHASE COMPLETED");
 

@@ -41,13 +41,14 @@ import utils.Credentials;
  * notifyPositiveUser({codice_fiscale}) -> boolean
  *
  */
-public class AppServer {
+public class AppServer extends SSLServer {
 
     private String salt1 = "";
     private String salt2 = "";
     private final Database database;
 
-    public AppServer() {
+    public AppServer() throws IOException {
+        super(Config.SERVER_KEYSTORE, Config.SERVER_TRUSTSTORE, "changeit", Config.APP_SERVER_PORT);
         this.database = new Database();
         SecretKey key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "salt1");
         this.salt1 = ServerUtils.toString(key1.getEncoded());
@@ -64,7 +65,7 @@ public class AppServer {
 
         User loggedUser = null;
         try {
-            if (!endpointName.equals("LOGIN") && !endpointName.equals("REGISTER")) {
+            if (!endpointName.equals("login") && !endpointName.equals("register")) {
                 AuthToken token = req.getToken();
                 if (token == null) {
                     throw new AuthenticationException("The authentication token is not valid");
@@ -77,26 +78,25 @@ public class AppServer {
             }
 
             Serializable data = "Internal server error";
-            switch (req.getEndpointName()) {
-                case "login":
+            Logger.getGlobal().info(endpointName);
+            switch (endpointName) {
+                case "login" -> {
                     Credentials loginData = (Credentials) req.getPayload();
                     data = this.login(loginData.getCf(), loginData.getPassword());
-                    break;
-                case "register":
+                }
+                case "register" -> {
                     Credentials registerData = (Credentials) req.getPayload();
                     data = this.register(registerData.getCf(), registerData.getPassword());
-                    break;
-                case "createReport":
+                }
+                case "createReport" -> {
                     ContactReportMessage createReportData = (ContactReportMessage) req.getPayload();
                     data = this.createReport(createReportData.getIdUserToReport(), createReportData.getDuration(), createReportData.getStartDateTime(), loggedUser);
-                    break;
-                case "getNotifications":
-                    data = this.getNotifications(loggedUser);
-                    break;
-                case "getNotificationSuspensionDate":
+                }
+                case "getNotifications" -> data = this.getNotifications(loggedUser);
+                case "getNotificationSuspensionDate" -> {
                     String code = (String) req.getPayload();
                     data = this.getNotificationSuspensionDate(code, loggedUser);
-                    break;
+                }
 //                case "notifyPositiveUser":
 //                    response = this.notifyPositiveUser(payload.getCf());
 //                    break;
@@ -106,9 +106,9 @@ public class AppServer {
             }
             return Response.make(data);
         } catch (AuthenticationException e) {
-            return Response.make(e.getMessage());
+            return Response.error(e.getMessage());
         } catch (Exception e) {
-            return Response.make("Internal server error");
+            return Response.error("Internal server error");
         }
     }
 

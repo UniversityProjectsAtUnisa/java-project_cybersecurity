@@ -38,10 +38,10 @@ public class SSLClient {
                 Request req = Request.make(endpoint, data, token);
                 out.writeObject(req);
                 out.flush();
-            }
 
-            try (ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
-                return (Response) in.readObject();
+                try (ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
+                    return (Response) in.readObject();
+                }
             }
         } catch (IOException | ClassNotFoundException e) {
             Logger.getGlobal().warning("RequestFailed: " + e.getMessage());
