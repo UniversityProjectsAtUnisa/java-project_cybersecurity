@@ -2,7 +2,7 @@ package src.AppClient;
 
 import apis.ServerApiService;
 import core.tokens.AuthToken;
-import entities.Credentials;
+import utils.Credentials;
 import entities.Notification;
 import utils.AppTimer;
 import utils.Config;

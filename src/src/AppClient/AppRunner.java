@@ -1,3 +1,5 @@
+package src.AppClient;
+
 import src.AppClient.AppClient;
 import src.AppServer.AppServer;
 import utils.AppTimer;

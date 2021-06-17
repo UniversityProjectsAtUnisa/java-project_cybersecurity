@@ -1,7 +1,5 @@
 package utils;
 
-import entities.Credentials;
-
 public class SimulationData {
     public static final Credentials[] VALID_CREDENTIALS = {
             new Credentials("CF1", "PASSWORD-CF1"),
