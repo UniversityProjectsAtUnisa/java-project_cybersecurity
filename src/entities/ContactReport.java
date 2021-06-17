@@ -12,7 +12,7 @@ import java.util.Arrays;
  *
  * @author marco
  */
-public class ContactReport {
+public class ContactReport implements  Comparable{
     private final byte[] id_segnalatore;
     private final byte[] id_segnalato;
     private final int durata;
@@ -50,4 +50,13 @@ public class ContactReport {
         return durata == that.durata && Arrays.equals(id_segnalatore, that.id_segnalatore) && Arrays.equals(id_segnalato, that.id_segnalato) && data_inizio_contatto.equals(that.data_inizio_contatto);
     }
 
+    @Override
+    public int compareTo(Object o) {
+        ContactReport contactReport = (ContactReport) o;
+        if(this == contactReport){
+            return 0;
+        }else{
+            return this.getData_inizio_contatto().compareTo(contactReport.data_inizio_contatto);
+        }
+    }
 }

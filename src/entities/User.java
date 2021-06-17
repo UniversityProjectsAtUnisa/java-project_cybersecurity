@@ -11,7 +11,7 @@ import java.util.Objects;
 
 /**
  */
-public class User {
+public class User implements Comparable {
     private static int count = 0;
 
     private final byte[] cf;
@@ -102,4 +102,15 @@ public class User {
     }
 
 
+    @Override
+    public int compareTo(Object o) {
+        User user = (User) o;
+        if(this == user){
+           return 0;
+        }else if(this.getId() > user.getId()){
+            return 1;
+        }else{
+            return -1;
+        }
+    }
 }

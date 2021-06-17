@@ -11,7 +11,7 @@ import java.util.Date;
 
 /**
  */
-public class NotificationToken {
+public class NotificationToken implements Comparable {
     private final String codice;
     private Timestamp data_scadenza;
     private Timestamp data_revoca;
@@ -62,5 +62,17 @@ public class NotificationToken {
 
     public void setData_revoca(Timestamp data_revoca) {
         this.data_revoca = data_revoca;
+    }
+
+    @Override
+    public int compareTo(Object o) {
+        NotificationToken notificationToken = (NotificationToken) o;
+        if(this == notificationToken){
+            return 0;
+        }else if(this.getId() > notificationToken.getId()){
+            return 1;
+        }else{
+            return -1;
+        }
     }
 }

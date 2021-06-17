@@ -6,6 +6,7 @@ import utils.Config;
 
 public class MainRunner {
     public static void main(String[] args) {
+        /*
         AppTimer globalAppTimer = AppTimer.getInstance();
         AppServer appServer = new AppServer();
         AppClient[] clients = new AppClient[Config.CLIENT_COUNT];
@@ -19,10 +20,10 @@ public class MainRunner {
         }
 
         globalAppTimer.start();
-        /*
+         */
+
         AppServer server = new AppServer();
 
         System.out.println(server.getSalt1());
-         */
     }
 }
