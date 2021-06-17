@@ -22,9 +22,9 @@ public abstract class SSLServer {
 
     public SSLServer(String keyStore, String trustStore, String password, int port, boolean useClientAuth) throws IOException {
         System.setProperty("javax.net.ssl.keyStore", Config.KEYSTORES_BASE_PATH + keyStore);
-        System.setProperty("javax.net.ssl.keyStorePassword", Config.KEYSTORES_BASE_PATH + password);
+        System.setProperty("javax.net.ssl.keyStorePassword", password);
         System.setProperty("javax.net.ssl.trustStore", Config.KEYSTORES_BASE_PATH + trustStore);
-        System.setProperty("javax.net.ssl.trustStorePassword", Config.KEYSTORES_BASE_PATH + password);
+        System.setProperty("javax.net.ssl.trustStorePassword", password);
 
         SSLServerSocketFactory sslFactory = (SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
         serverSocket = (SSLServerSocket) sslFactory.createServerSocket(port, BACKLOG);
