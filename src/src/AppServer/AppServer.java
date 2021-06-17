@@ -4,12 +4,10 @@
  * and open the template in the editor.
  */
 package src.AppServer;
-import java.io.*;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.MessageDigest;
-import java.time.format.DateTimeFormatterBuilder;
 import java.util.*;
 import java.sql.Timestamp;
 
@@ -74,7 +72,7 @@ public class AppServer {
         if (passwordHased == user.getPassword()){
             Timestamp now = ServerUtils.getNow();
             int id = user.getId();
-            this.database.update_user(user.getCf(), now, null, null);
+            this.database.update_user(user.getCf(), ServerUtils.getNow(), null, null);
             AuthToken token = new AuthToken(id);
             return token.getToken(this.getSalt2());
         }
@@ -91,14 +89,18 @@ public class AppServer {
         byte[] passwordConcat = ServerUtils.concatByteArray(passwordBytes, userSalt);
 
         MessageDigest md = MessageDigest.getInstance("SHA-256");
-        byte[] passwordHased = md.digest(passwordConcat);
+        byte[] passwordHashed = md.digest(passwordConcat);
 
-        //this.database.add_user(cf, passwordHased, userSalt);
+        this.database.add_user(ServerUtils.toByteArray(cf), passwordHashed, userSalt);
 
         return true;
     }
 
-    public boolean createReport(int id, int duration, Timestamp date, AuthToken token){
+    public boolean createReport(int id, int duration, Timestamp date, AuthToken token) throws NoSuchAlgorithmException, InvalidKeyException {
+        if(!token.isValid(this.getSalt2())){
+            return false;
+        }
+
         String payload = token.getPayload();
         String strIdUser = payload.substring(0, payload.indexOf(","));
         int idUser = Integer.parseInt(strIdUser);
@@ -130,7 +132,10 @@ public class AppServer {
         return true;
     }
 
-    public LinkedList<NotificationToken> getNotifications(core.tokens.NotificationToken token){
+    public LinkedList<NotificationToken> getNotifications(core.tokens.NotificationToken token) throws NoSuchAlgorithmException, InvalidKeyException {
+        if(!token.isValid(this.getSalt1(), this.getSalt2())){
+            return null;
+        }
         String payload = token.getPayload();
         String strIdUser = payload.substring(0, payload.indexOf(","));
         int idUser = Integer.parseInt(strIdUser);
