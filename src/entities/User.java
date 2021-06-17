@@ -11,8 +11,7 @@ import java.util.Objects;
 
 /**
  */
-public class User implements Comparable {
-    private static int count = 0;
+public class User implements Comparable<User> {
 
     private final byte[] cf;
     private final int id;
@@ -22,9 +21,9 @@ public class User implements Comparable {
     private Timestamp lastPositiveSwabDate;
     private Timestamp lastSwabCreationDate;
 
-    public User(byte[] cf,byte[] password,byte[] userSalt) {
+    public User(int id, byte[] cf, byte[] password, byte[] userSalt) {
         this.cf = cf;
-        this.id = count++;
+        this.id = id;
         this.password = password;
         this.userSalt = userSalt;
         this.lastLoginDate = null;
@@ -32,11 +31,11 @@ public class User implements Comparable {
         this.lastPositiveSwabDate = null;
     }
 
-    public User(byte[] cf,byte[] password,byte[] userSalt,
-                Timestamp lastLoginDate, Timestamp lastSwabCreationDate,
-                Timestamp lastPositiveSwabDate) {
+    public User(int id, byte[] cf, byte[] password, byte[] userSalt,
+            Timestamp lastLoginDate, Timestamp lastSwabCreationDate,
+            Timestamp lastPositiveSwabDate) {
         this.cf = cf;
-        this.id = count++;
+        this.id = id;
         this.password = password;
         this.userSalt = userSalt;
         this.lastLoginDate = lastLoginDate;
@@ -92,25 +91,20 @@ public class User implements Comparable {
         this.lastSwabCreationDate = lastSwabCreationDate;
     }
 
-
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         User user = (User) o;
-        return id == user.id && Arrays.equals(cf, user.cf) && Arrays.equals(password, user.password) && Arrays.equals(userSalt, user.userSalt) && Objects.equals(lastLoginDate, user.lastLoginDate) && Objects.equals(lastPositiveSwabDate, user.lastPositiveSwabDate) && Objects.equals(lastSwabCreationDate, user.lastSwabCreationDate);
+        return id == user.id;
     }
 
-
     @Override
-    public int compareTo(Object o) {
-        User user = (User) o;
-        if(this == user){
-           return 0;
-        }else if(this.getId() > user.getId()){
-            return 1;
-        }else{
-            return -1;
-        }
+    public int compareTo(User u) {
+        return this.getId() - u.getId();
     }
 }

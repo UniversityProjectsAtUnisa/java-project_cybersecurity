@@ -5,6 +5,7 @@
  */
 package core.tokens;
 
+import exceptions.InvalidTokenFormat;
 import src.AppServer.ServerUtils;
 
 import java.security.InvalidKeyException;
@@ -12,32 +13,54 @@ import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 
 /**
- * Auth:         BASE64(id, data_creazione).HMACSHA256(BASE64(id, data_creazione), sale_2)
- * */
-public class AuthToken extends BaseToken  {
-
-    private int id;
-    private Timestamp createdAt;
+ * Auth: BASE64(id, data_creazione).HMACSHA256(BASE64(id, data_creazione),
+ * sale_2)
+ *
+ */
+public final class AuthToken extends Token {
 
     public int getId() {
-        return id;
+        String[] parts = this.getPayload().split(",");
+        if (parts.length != 2) {
+            throw new InvalidTokenFormat("The payload does not contain exactly one comma");
+        }
+        return Integer.parseInt(parts[0]);
+    }
+
+    public Timestamp getCreatedAt() {
+        String[] parts = this.getPayload().split(",");
+        if (parts.length != 2) {
+            throw new InvalidTokenFormat("The payload does not contain exactly one comma");
+        }
+        return Timestamp.valueOf(parts[1]);
     }
 
     public AuthToken(int id, String salt2) throws NoSuchAlgorithmException, InvalidKeyException {
-        super(id+","+ServerUtils.getNow(), ServerUtils.toByteArray(salt2));
-        this.id = id;
-        this.createdAt = ServerUtils.getNow();
+        super(id + "," + ServerUtils.getNow(), ServerUtils.toByteArray(salt2));
     }
 
-    public String getToken() {
-        return this.getPayload()+"."+this.getSigma();
+    public AuthToken(String raw) throws NoSuchAlgorithmException, InvalidKeyException {
+        super(raw);
+        checkPayloadFormat();
+    }
+    
+    private void checkPayloadFormat() {
+        getId();
+        getCreatedAt();
     }
 
-    public boolean isValid(int id, String salt2) throws NoSuchAlgorithmException, InvalidKeyException {
-        AuthToken tmpAuthToken = new AuthToken(id, salt2);
-        String tmpTokenCode = tmpAuthToken.getToken();
+    @Override
+    public String toString() {
+        return "AuthToken: " + super.toString();
+    }
 
-        return this.getSigma().equals(tmpTokenCode);
+    public boolean isValid(Timestamp lastLogin, String salt) throws NoSuchAlgorithmException, InvalidKeyException {
+        Timestamp createdAt = this.getCreatedAt();
+        if (!createdAt.equals(lastLogin)) {
+            return false;
+        }
+        checkPayloadFormat();
+        return this.verifySigma(ServerUtils.toByteArray(salt));
     }
 
 }
