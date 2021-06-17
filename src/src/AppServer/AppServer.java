@@ -4,6 +4,7 @@
  * and open the template in the editor.
  */
 package src.AppServer;
+import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -13,11 +14,16 @@ import java.sql.Timestamp;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.logging.Logger;
 
+import core.Request;
+import core.Response;
+import core.SSLServer;
 import core.tokens.*;
 import entities.Contact;
 import entities.ContactReport;
 import entities.User;
+import utils.Config;
 
 import javax.crypto.SecretKey;
 
@@ -41,18 +47,24 @@ import javax.crypto.SecretKey;
  *
  */
 
-public class AppServer {
+public class AppServer extends SSLServer {
 
     private String salt1 = "";
     private String salt2 = "";
     private Database database;
 
-    public AppServer() {
+    public AppServer() throws IOException {
+        super(Config.SERVER_KEYSTORE, Config.SERVER_TRUSTSTORE, "changeit", Config.APP_SERVER_PORT);
         this.database = new Database();
-        SecretKey key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks","changeit","salt1");
+        /*SecretKey key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks","changeit","salt1");
         this.salt1 = ServerUtils.toString(key1.getEncoded());
         SecretKey key2 = ServerUtils.loadFromKeyStore("./salts_keystore.jks","changeit","salt2");
-        this.salt2 = ServerUtils.toString(key2.getEncoded());
+        this.salt2 = ServerUtils.toString(key2.getEncoded());*/
+    }
+
+    @Override
+    protected Response handleRequest(Request req) {
+        return Response.make("ciao");
     }
 /*
     public <T> void handleRequest(Request req){

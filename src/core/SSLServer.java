@@ -33,6 +33,10 @@ public abstract class SSLServer {
         Logger.getGlobal().log(Level.INFO, "SERVER CREATED WITH CLIENTAUTH={0}", useClientAuth);
     }
 
+    public SSLServer(String keyStore, String trustStore, String password, int port) throws IOException {
+        this(keyStore, trustStore, password, port, false);
+    }
+
     public void start() {
         ObjectInputStream in = null;
         ObjectOutputStream out = null;
@@ -40,9 +44,11 @@ public abstract class SSLServer {
         while (true) {
             try (SSLSocket acceptedSocket = (SSLSocket) serverSocket.accept()) {
                 Logger.getGlobal().info("ACCEPTED INCOMING CONNECTION");
+                System.out.println(acceptedSocket.getInputStream());
                 in = new ObjectInputStream(acceptedSocket.getInputStream());
                 out = new ObjectOutputStream(acceptedSocket.getOutputStream());
 
+                Logger.getGlobal().info("READING REQUEST");
                 Request req = (Request) in.readObject();
                 Logger.getGlobal().info(req.toString());
                 Response res = handleRequest(req);

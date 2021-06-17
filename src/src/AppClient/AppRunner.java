@@ -5,28 +5,32 @@ import src.AppServer.AppServer;
 import utils.AppTimer;
 import utils.Config;
 
+import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
+import java.util.logging.Logger;
 
 
 public class AppRunner {
-    public static void main(String[] args) {
-        /*
+    public static void main(String[] args) throws IOException {
+        System.setProperty("javax.net.debug", "ssl");
         AppTimer globalAppTimer = AppTimer.getInstance();
         AppClient[] clients = new AppClient[Config.CLIENT_COUNT];
 
         for (int i = 0; i < clients.length; i++) {
             clients[i] = new AppClient();
         }
-        
+
+        Logger.getGlobal().info("START LOGIN PHASE");
         for (AppClient client: clients) {
             client.login();
         }
+        Logger.getGlobal().info("LOGIN PHASE COMPLETED");
 
+        Logger.getGlobal().info("START GLOBAL CLOCK");
         globalAppTimer.start();
-        */
-        AppServer server = new AppServer();
+        /*AppServer server = new AppServer();
         HashMap<String, String> userRegInfo = new HashMap<String, String>() {{
             put("AAAAAA00A00A000A", "password1");
             put("BBBBBB00B00B000B", "password2");
@@ -48,6 +52,6 @@ public class AppRunner {
             }
         });
 
-        System.out.println(server.getSalt1());
+        System.out.println(server.getSalt1());*/
     }
 }
