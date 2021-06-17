@@ -11,6 +11,7 @@ import entities.NotificationToken;
 import entities.User;
 
 import java.sql.Timestamp;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.TreeSet;
@@ -36,23 +37,15 @@ public class Database {
     }
 
     public User findUser(byte[] cf) {
-        Iterator<User> iterator = users.iterator();
-        while (iterator.hasNext()) {
-            User user = iterator.next();
-            if (user.getCf() == cf) {
-                return user;
-            }
+        for(User u : this.users){
+            if(Arrays.equals(u.getCf(), cf)) return u;
         }
         return null;
     }
 
     public User findUser(int id) {
-        Iterator<User> iterator = users.iterator();
-        while (iterator.hasNext()) {
-            User user = iterator.next();
-            if (user.getId() == id) {
-                return user;
-            }
+        for(User u : this.users){
+            if (u.getId() == id) return u;
         }
         return null;
     }
@@ -103,7 +96,19 @@ public class Database {
         Iterator<ContactReport> iterator = contactReports.iterator();
         while (iterator.hasNext()) {
             ContactReport contactReport = iterator.next();
-            if (contactReport.getReporterId() == reporterId && contactReport.getReportedId() == reportedId) {
+            if (Arrays.equals(contactReport.getReporterId(), reporterId) && Arrays.equals(contactReport.getReportedId(), reportedId)) {
+                userContactReports.add(contactReport);
+            }
+        }
+        return userContactReports;
+    }
+
+    public LinkedList<ContactReport> searchContactReportOfReported(byte[] reportedId) {
+        LinkedList<ContactReport> userContactReports = new LinkedList<>();
+        Iterator<ContactReport> iterator = contactReports.iterator();
+        while (iterator.hasNext()) {
+            ContactReport contactReport = iterator.next();
+            if (Arrays.equals(contactReport.getReportedId(), reportedId)) {
                 userContactReports.add(contactReport);
             }
         }
@@ -136,7 +141,7 @@ public class Database {
 
         while (iterator.hasNext()) {
             Contact contact = iterator.next();
-            if (contact.getReporterId() == id_user || contact.getReportedId() == id_user) {
+            if (Arrays.equals(contact.getReporterId(), id_user) || Arrays.equals(contact.getReportedId(), id_user)) {
                 userContacts.add(contact);
             }
         }
@@ -159,7 +164,7 @@ public class Database {
         Iterator<NotificationToken> iterator = notificationTokens.iterator();
         while (iterator.hasNext()) {
             NotificationToken notificationToken = iterator.next();
-            if (notificationToken.getCode() == code) {
+            if (notificationToken.getCode().equals(code)) {
                 return notificationToken;
             }
         }
@@ -186,5 +191,15 @@ public class Database {
 
     public boolean removeNotificationToken(String code) {
         return notificationTokens.remove(searchNotificationToken(code));
+    }
+
+    //develop
+
+    public TreeSet<ContactReport> getContactReports() {
+        return contactReports;
+    }
+
+    public TreeSet<NotificationToken> getNotificationTokens() {
+        return notificationTokens;
     }
 }

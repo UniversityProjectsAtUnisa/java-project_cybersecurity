@@ -20,6 +20,7 @@ import entities.ContactReport;
 import entities.User;
 
 import javax.crypto.SecretKey;
+import javax.xml.crypto.Data;
 
 /**
  *
@@ -84,27 +85,26 @@ public class AppServer {
         return response;
     }
 */
-    public String login(String cf, String password) throws NoSuchAlgorithmException, InvalidKeyException {
+    public AuthToken login(String cf, String password) throws NoSuchAlgorithmException, InvalidKeyException {
         User user = this.database.findUser(ServerUtils.toByteArray(cf));
         if (user == null){
-            return "error"; //maybe an exception
+            return null;
         }
         byte[] userSalt = user.getUserSalt();
         byte[] passwordBytes = password.getBytes();
 
-        byte[] passwordConcat = ServerUtils.concatByteArray(userSalt, passwordBytes);
+        byte[] passwordConcat = ServerUtils.concatByteArray(passwordBytes, userSalt);
 
         MessageDigest md = MessageDigest.getInstance("SHA-256");
         byte[] passwordHashed = md.digest(passwordConcat);
-
-        if (passwordHashed == user.getPassword()){
+        if (Arrays.equals(passwordHashed, user.getPassword())){
             Timestamp now = ServerUtils.getNow();
             int id = user.getId();
             this.database.updateUser(user.getCf(), ServerUtils.getNow(), null, null);
             AuthToken token = new AuthToken(id, this.getSalt2());
-            return token.getToken();
+            return token;
         }
-        return "error";
+        return null;
     }
 
     public boolean register(String cf, String password) throws NoSuchAlgorithmException {
@@ -125,35 +125,73 @@ public class AppServer {
     }
 
     public boolean createReport(int id, int duration, Timestamp date, AuthToken token) throws NoSuchAlgorithmException, InvalidKeyException {
-        if(!token.isValid(id, this.getSalt2())){
+        if(!token.isValid(token.getId(), token.getCreatedAt(), this.getSalt2())){
             return false;
         }
-
-        String payload = token.getPayload();
-        String strIdUser = payload.substring(0, payload.indexOf(","));
-        int idUser = Integer.parseInt(strIdUser);
+        System.out.println("crea il report");
+        int idUser = token.getId();
         User user = this.database.findUser(idUser);
-        byte[] cfSegnalatore = user.getCf();
-        byte[] cfSegnalato = this.database.findUser(id).getCf();
+        byte[] cfReporter = user.getCf();
+        byte[] cfReported = this.database.findUser(id).getCf();
 
+        LinkedList<ContactReport> reports = this.database.searchContactReportOfReported(cfReporter);
+        System.out.println("\n"+reports.size()+"\n");
 
-        LinkedList<ContactReport> contacts = this.database.searchContactReportOfUsers(cfSegnalato, cfSegnalatore);
+        reports.forEach((c) -> {
+            System.out.println("reportedId" + c.getReportedId());
+        });
 
+        if (reports.size() == 0){
+            this.database.addContactReport(cfReporter, cfReported, duration, date);
+            return true;
+        }
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd H:mm:ss");
+        Timestamp cEndDateMax =  new Timestamp(0);
+
+        LocalDateTime reportEndDate = date.toLocalDateTime().plusSeconds(duration);
+        String strReportEndDate = reportEndDate.format(formatter);
+        Timestamp timestampReportEndDate = Timestamp.valueOf(strReportEndDate);
         //algorithm
-        for (ContactReport c: contacts) {
-            if(c.getStartContactDate().before(date)){
-                //the contact in the table is longer than new contact advisor
-                LocalDateTime datetime = date.toLocalDateTime();
+        for (ContactReport c: reports) {
+            LocalDateTime datetime = c.getStartContactDate().toLocalDateTime();
+
+            datetime=datetime.minusMinutes(15);
+            String afterSubtraction=datetime.format(formatter);
+            Timestamp timestampAfterSubtraction = Timestamp.valueOf(afterSubtraction);
+
+            LocalDateTime cEndDate = c.getStartContactDate().toLocalDateTime().plusSeconds(c.getDuration());
+            String strCEndDate = cEndDate.format(formatter);
+            Timestamp timestampCEndDate = Timestamp.valueOf(strCEndDate);
+
+            cEndDateMax = ServerUtils.maxTimestamp(cEndDateMax, timestampCEndDate);
+
+            if((!c.getStartContactDate().after(date) && !date.after(timestampCEndDate) ||
+                    !c.getStartContactDate().before(date) && !timestampReportEndDate.before(c.getStartContactDate())) &&
+                    !c.getStartContactDate().before(timestampAfterSubtraction)){
+
+                System.out.println("la data viene prim senza aggiungere la durata");
+
                 LocalDateTime cDate = c.getStartContactDate().toLocalDateTime().plusSeconds(c.getDuration());
 
-                if (datetime.plusSeconds(duration).isBefore(cDate)){
-                    this.database.addContact(cfSegnalatore, cfSegnalato, duration, date);
-                } else {
-                    this.database.addContact(cfSegnalatore, cfSegnalato, c.getDuration(), date);
-                    this.database.removeContactReport(cfSegnalato, cfSegnalatore, c.getStartContactDate());
-                    this.database.addContactReport(cfSegnalatore, cfSegnalato, duration, date);
+                if (timestampReportEndDate.after(timestampCEndDate)){
+                    this.database.removeContactReport(cfReported, cfReporter, c.getStartContactDate());
                 }
+
+                Timestamp maxInit = ServerUtils.maxTimestamp(date, c.getStartContactDate());
+                Timestamp minEnd = ServerUtils.minTimestamp(timestampReportEndDate, timestampCEndDate);
+                int durationNewContact = ServerUtils.diffTimestampSec(minEnd, maxInit);
+
+                System.out.println("init: "+maxInit.toString()+ ", end:"+minEnd.toString()+", duration:" + durationNewContact);
+
+                this.database.addContact(cfReporter, cfReported, durationNewContact, maxInit);
+
+            }else{
+                System.out.println("la data viene dopo senza aggiungere la durata");
             }
+        }
+        if (!timestampReportEndDate.before(cEndDateMax)) {
+            this.database.addContactReport(cfReporter, cfReported, duration, date);
         }
         //end algorithm
 
@@ -188,16 +226,18 @@ public class AppServer {
         return true;
     }
 
-    public String getNotificationDetails(String code){
-        return this.database.searchNotificationToken(code).getCode();
+    public entities.NotificationToken getNotificationDetails(String code){
+        return this.database.searchNotificationToken(code);
     }
 
     public boolean notifyPositiveUser(String cf) throws NoSuchAlgorithmException, InvalidKeyException {
         User user = this.database.findUser(ServerUtils.toByteArray(cf));
         LinkedList<Contact> contacts = this.database.searchContactsOfUser(user.getCf());
+        user.setLastPositiveSwabDate(ServerUtils.getNow());
+        this.database.updateUser(user.getCf(), null, null, ServerUtils.getNow());
 
         //algorithm
-        HashMap durationMap = new HashMap<User, Integer>();
+        Map<User, Integer> durationMap = new HashMap<>();
         for (Contact c: contacts) {
             User user_i = this.database.findUser(c.getReporterId());
             User user_j = this.database.findUser(c.getReportedId());
@@ -208,21 +248,25 @@ public class AppServer {
             datetime=datetime.minusHours(480);
             String afterSubtraction=datetime.format(formatter);
             Timestamp timestampAfterSubtraction = Timestamp.valueOf(afterSubtraction);
-            if (user_i.getLastPositiveSwabDate().after(timestampAfterSubtraction)  &&
-                    c.getStartContactDate().after(user_i.getLastPositiveSwabDate())){
-                durationMap.put(user_i, (Integer)durationMap.get(user_i) + c.getDuration());
+            if (user_i.getLastPositiveSwabDate() != null &&
+                    (user_i.getLastPositiveSwabDate().after(timestampAfterSubtraction)  ||
+                    c.getStartContactDate().after(user_i.getLastPositiveSwabDate()))){
+                int prevValue = durationMap.get(user_j) == null ? 0 : (Integer)durationMap.get(user_j);
+                durationMap.put(user_j, (Integer)prevValue + c.getDuration());
             }
-            if (user_j.getLastPositiveSwabDate().after(timestampAfterSubtraction)  &&
-                    c.getStartContactDate().after(user_j.getLastPositiveSwabDate())){
-                durationMap.put(user_j, (Integer)durationMap.get(user_j) + c.getDuration());
+            if (user_j.getLastPositiveSwabDate() != null &&
+                    (user_j.getLastPositiveSwabDate().after(timestampAfterSubtraction)  ||
+                    c.getStartContactDate().after(user_j.getLastPositiveSwabDate()))){
+                int prevValue = durationMap.get(user_i) == null ? 0 : (Integer)durationMap.get(user_i);
+                durationMap.put(user_i, (Integer)prevValue + c.getDuration());
             }
 
         }
         //end algorithm
-
-        durationMap.forEach ((key, value) ->{
+        for (Map.Entry<User,Integer> entry : durationMap.entrySet()){
+            int value = entry.getValue();
+            User u = entry.getKey();
             if ((Integer)value > (Integer)15){
-                User u = (User)key;
                 NotificationToken notificationT = null;
                 try {
                     notificationT = new NotificationToken(u.getId(), ServerUtils.toString(u.getCf()),
@@ -241,8 +285,9 @@ public class AppServer {
                     e.printStackTrace();
                 }
                 this.database.addNotificationToken(code, u.getId());
+                this.database.updateUser(u.getCf(), null, ServerUtils.getNow(), null);
             }
-        });
+        }
 
         return true;
 
@@ -255,4 +300,7 @@ public class AppServer {
     public String getSalt2() {
         return salt2;
     }
+
+    //develop
+    public Database getDatabase() {return this.database;}
 }

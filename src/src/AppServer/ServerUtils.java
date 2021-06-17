@@ -6,8 +6,12 @@ import java.security.KeyStore;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.sql.Time;
 import java.sql.Timestamp;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.util.Date;
 
 public class ServerUtils {
 
@@ -66,38 +70,38 @@ public class ServerUtils {
 
     public static boolean fileWrite(String path, String content) throws IOException {
         FileWriter fileWriter = new FileWriter(path);
-            String fileContent = content;
-            fileWriter.write(fileContent);
-            fileWriter.close();
-            return true;
+        String fileContent = content;
+        fileWriter.write(fileContent);
+        fileWriter.close();
+        return true;
     }
 
     public static String fileRead(String path) throws IOException {
         String content = "";
         FileReader fileReader = new FileReader(path);
-            int ch = fileReader.read();
-            while (ch != -1) {
-                content += ch;
-                fileReader.close();
-            }
-            return content;
+        int ch = fileReader.read();
+        while (ch != -1) {
+            content += ch;
+            fileReader.close();
+        }
+        return content;
     }
 
-    public static void storeToKeyStore(SecretKey keyToStore, String password, String filepath, String keyAlias) throws Exception{
+    public static void storeToKeyStore(SecretKey keyToStore, String password, String filepath, String keyAlias) throws Exception {
         File file = new File(filepath);
         KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-        if(!file.exists()){
-            keyStore.load(null,null);
-        }else{
+        if (!file.exists()) {
+            keyStore.load(null, null);
+        } else {
             InputStream keyStoreData = new FileInputStream(filepath);
             keyStore.load(keyStoreData, password.toCharArray());
         }
-        keyStore.setKeyEntry(keyAlias,keyToStore,password.toCharArray(),null);
+        keyStore.setKeyEntry(keyAlias, keyToStore, password.toCharArray(), null);
         OutputStream writeStream = new FileOutputStream(filepath);
-        keyStore.store(writeStream,password.toCharArray());
+        keyStore.store(writeStream, password.toCharArray());
     }
 
-    public static SecretKey loadFromKeyStore(String filepath,String password,String keyAlias) {
+    public static SecretKey loadFromKeyStore(String filepath, String password, String keyAlias) {
         try {
             KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
             InputStream readStream = new FileInputStream(filepath);
@@ -110,8 +114,32 @@ public class ServerUtils {
         return null;
     }
 
-    public static Timestamp getNow(){
-        Timestamp instant= Timestamp.from(Instant.now());
+    public static Timestamp getNow() {
+        Timestamp instant = Timestamp.from(Instant.now());
         return instant;
     }
+
+    public static Timestamp maxTimestamp(Timestamp t1, Timestamp t2) {
+        if (t1.compareTo(t2) > 0) {
+            return t1;
+        } else {
+            return t2;
+        }
+    }
+
+    public static Timestamp minTimestamp(Timestamp t1, Timestamp t2) {
+        if (t1.compareTo(t2) > 0) {
+            return t2;
+        } else {
+            return t1;
+        }
+    }
+
+    public static int diffTimestampSec(Timestamp t1, Timestamp t2)  {
+        long timeT1 = t1.getTime();
+        long timeT2 = t2.getTime();
+        long diff = Math.round(Math.abs(timeT1 - timeT2)/1000);
+        return (int) diff;
+    }
+
 }

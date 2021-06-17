@@ -54,7 +54,7 @@ public class NotificationToken extends BaseToken {
         NotificationToken tmpNotificationToken = new NotificationToken(id, cf, expireDate, salt1, salt2);
         String tmpTokenCode = tmpNotificationToken.getToken();
 
-        return this.getSigma().equals(tmpTokenCode);
+        return this.getToken().equals(tmpTokenCode);
     }
 
 }

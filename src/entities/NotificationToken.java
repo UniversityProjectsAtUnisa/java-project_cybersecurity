@@ -27,7 +27,7 @@ public class NotificationToken implements Comparable {
     private Timestamp getExpireDateFromCode(String code) {
         try {
             String data = code.substring(code.indexOf(",") + 1, code.indexOf("."));
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             Date parsedDate = dateFormat.parse(data);
             Timestamp timestamp = new java.sql.Timestamp(parsedDate.getTime());
             return timestamp;
