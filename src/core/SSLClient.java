@@ -14,19 +14,22 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import utils.Config;
 
 public class SSLClient {
+
     private final SSLSocketFactory sslFactory;
     private final String hostIp;
     private final int port;
 
     public SSLClient(String keyStore, String trustStore, String password, String hostIp, int port) {
+
         if (keyStore != null) {
-            System.setProperty("javax.net.ssl.keyStore", keyStore);
-            System.setProperty("javax.net.ssl.keyStorePassword", password);
+            System.setProperty("javax.net.ssl.keyStore", Config.KEYSTORES_BASE_PATH + keyStore);
+            System.setProperty("javax.net.ssl.keyStorePassword", Config.KEYSTORES_BASE_PATH + password);
         }
-        System.setProperty("javax.net.ssl.trustStore", trustStore);
-        System.setProperty("javax.net.ssl.trustStorePassword", password);
+        System.setProperty("javax.net.ssl.trustStore", Config.KEYSTORES_BASE_PATH + trustStore);
+        System.setProperty("javax.net.ssl.trustStorePassword", Config.KEYSTORES_BASE_PATH + password);
 
         sslFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
         this.hostIp = hostIp;
@@ -39,13 +42,13 @@ public class SSLClient {
             socket.startHandshake();
 
             try (ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-                 ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream())) {
+                    ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream())) {
                 Request req = Request.make(endpoint, data, token);
                 out.writeObject(req);
                 out.flush();
                 return (Response) in.readObject();
             }
-        } catch(IOException | ClassNotFoundException e) {
+        } catch (IOException | ClassNotFoundException e) {
             throw new RequestFailedException(e.getMessage());
         }
     }

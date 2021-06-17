@@ -31,7 +31,6 @@ public class ServerUtils {
         return new String(chars);
     }
 
-
     public static String toString(
             byte[] bytes) {
         return toString(bytes, bytes.length);
@@ -65,39 +64,41 @@ public class ServerUtils {
     }
 
     public static boolean fileWrite(String path, String content) throws IOException {
-        FileWriter fileWriter = new FileWriter(path);
+        try (FileWriter fileWriter = new FileWriter(path)) {
             String fileContent = content;
             fileWriter.write(fileContent);
-            fileWriter.close();
-            return true;
+        } catch (IOException e) {
+            return false;
+        }
+        return true;
     }
 
     public static String fileRead(String path) throws IOException {
         String content = "";
         FileReader fileReader = new FileReader(path);
-            int ch = fileReader.read();
-            while (ch != -1) {
-                content += ch;
-                fileReader.close();
-            }
-            return content;
+        int ch = fileReader.read();
+        while (ch != -1) {
+            content += ch;
+            fileReader.close();
+        }
+        return content;
     }
 
-    public static void storeToKeyStore(SecretKey keyToStore, String password, String filepath, String keyAlias) throws Exception{
+    public static void storeToKeyStore(SecretKey keyToStore, String password, String filepath, String keyAlias) throws Exception {
         File file = new File(filepath);
         KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-        if(!file.exists()){
-            keyStore.load(null,null);
-        }else{
+        if (!file.exists()) {
+            keyStore.load(null, null);
+        } else {
             InputStream keyStoreData = new FileInputStream(filepath);
             keyStore.load(keyStoreData, password.toCharArray());
         }
-        keyStore.setKeyEntry(keyAlias,keyToStore,password.toCharArray(),null);
+        keyStore.setKeyEntry(keyAlias, keyToStore, password.toCharArray(), null);
         OutputStream writeStream = new FileOutputStream(filepath);
-        keyStore.store(writeStream,password.toCharArray());
+        keyStore.store(writeStream, password.toCharArray());
     }
 
-    public static SecretKey loadFromKeyStore(String filepath,String password,String keyAlias) {
+    public static SecretKey loadFromKeyStore(String filepath, String password, String keyAlias) {
         try {
             KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
             InputStream readStream = new FileInputStream(filepath);
@@ -110,8 +111,8 @@ public class ServerUtils {
         return null;
     }
 
-    public static Timestamp getNow(){
-        Timestamp instant= Timestamp.from(Instant.now());
+    public static Timestamp getNow() {
+        Timestamp instant = Timestamp.from(Instant.now());
         return instant;
     }
 }
