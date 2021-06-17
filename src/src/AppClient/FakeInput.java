@@ -1,11 +1,12 @@
 package src.AppClient;
 
+import entities.Credentials;
+import utils.SimulationData;
+
 public class FakeInput {
-    private static int index = 1;
+    private static int index = 0;
 
     public static Credentials getNextCredential() {
-        Credentials cred = new Credentials("cf"+index, "password"+index);
-        index++;
-        return cred;
+        return SimulationData.VALID_CREDENTIALS[index++];
     }
 }

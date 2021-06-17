@@ -1,7 +1,11 @@
 package src.AppClient;
 
 import apis.ServerApiService;
+import core.tokens.AuthToken;
+import entities.Credentials;
+import entities.Notification;
 import utils.AppTimer;
+import utils.Config;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -11,19 +15,11 @@ public class AppClient {
     private static final double MAX_DISTANCE = 2.0;
 
     private static class ContactCounter {
-        private int count = 0;
-        private final LocalDateTime startData;
+        private int count = 1;
+        private final LocalDateTime startDate;
 
         public ContactCounter() {
-            startData = LocalDateTime.now();
-        }
-
-        public int getCount() {
-            return count;
-        }
-
-        public LocalDateTime getStartData() {
-            return startData;
+            startDate = LocalDateTime.now();
         }
 
         public void increment() {
@@ -35,18 +31,19 @@ public class AppClient {
     private final BluetoothModule ble = new BluetoothModule();
     private final Map<Integer, ContactCounter> userCounter = new HashMap<>();
     private final ServerApiService serverApi = new ServerApiService();
-    // TODO: private AuthToken token;
+    private AuthToken token;
     private final Timer notificationTimer = new Timer();
 
     public boolean register() {
         Credentials c = FakeInput.getNextCredential();
-        // TODO: success = serverApi.register(c.cf, c.password);
-        return true;
+        return serverApi.register(c);
     }
 
     public boolean login() {
         Credentials c = FakeInput.getNextCredential();
-        // TODO: token = serverApi.login(c.cf, c.password);
+        token = serverApi.login(c);
+        if (token == null)
+            return false;
         appState = AppClientState.LOGGED;
         AppTimer.getInstance().subscribe(this);
         startNotificationTimer();
@@ -66,30 +63,38 @@ public class AppClient {
     }
 
     public void fetchNotifications() {
-        // TODO: serverApi.getNotifications(token);
+        Notification[] notifications = serverApi.getNotifications(token);
+        String log = String.format("User(%d) Notifications: %s", token.getId(), Arrays.toString(notifications));
+        Logger.getGlobal().info(log);
     }
 
     public void scanAndEmit() {
         if (appState != AppClientState.LOGGED) throw new RuntimeException();
         ble.emit(); // non blocking
-        BluetoothScan[] scanResult = ble.scan(1);  // TODO: replace 1 with token.id
-        scanResult = Arrays.stream(scanResult).filter((item) -> item.getDistance() < MAX_DISTANCE).toArray(BluetoothScan[]::new);
-        evaluateContactEnded(scanResult);
-        for (BluetoothScan scan: scanResult) {
-            evaluateScan(scan);
-        }
+        BluetoothScan[] scanResult = ble.scan(token.getId());
+        Set<BluetoothScan> filteredResult = new HashSet<>();  // remove duplicates and distant scans
+        Collections.addAll(
+            filteredResult,
+            Arrays.stream(scanResult).filter((item) -> item.getDistance() < MAX_DISTANCE).toArray(BluetoothScan[]::new)
+        );
+        filteredResult.forEach(this::evaluateScan);
+        evaluateContactEnded(filteredResult);
     }
 
     private void evaluateScan(BluetoothScan scan) {
         int id = scan.getId();
         if (userCounter.containsKey(id)) {
-            userCounter.get(id).increment();
+            ContactCounter cc = userCounter.get(id);
+            cc.increment();
+            if (cc.count >= Config.N_CUM) {  // if reach the limit
+                terminateContact(id);
+            }
         } else {
             userCounter.put(id, new ContactCounter());
         }
     }
 
-    private void evaluateContactEnded(BluetoothScan[] scanResult) {
+    private void evaluateContactEnded(Set<BluetoothScan> scanResult) {
         Set<Integer> currentIds = new HashSet<>(userCounter.keySet());
 
         Set<Integer> scannedIds = new HashSet<>();
@@ -98,11 +103,12 @@ public class AppClient {
         }
 
         currentIds.removeAll(scannedIds);
+        currentIds.forEach(this::terminateContact);
+    }
 
-        for (int id: currentIds) {
-            ContactCounter contactCounter = userCounter.remove(id);
-            Logger.getGlobal().info(String.format("ReportContact(id=%d, count=%d, startDate=%s)", id, contactCounter.getCount(), contactCounter.getStartData()));
-            // TODO: serverApi.reportContact(id, contactCounter.getCount() * Config.TC, contactCounter.getStartData(), token);
-        }
+    private void terminateContact(int id) {
+        ContactCounter contactCounter = userCounter.remove(id);
+        System.out.printf("ReportContact(id=%d, count=%d, startDate=%s)%n", id, contactCounter.count, contactCounter.startDate);
+        serverApi.reportContact(id, contactCounter.count * Config.TC, contactCounter.startDate, token);
     }
 }

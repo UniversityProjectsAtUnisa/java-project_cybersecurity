@@ -6,7 +6,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class BluetoothModule {
-    private static final double MAX_BLUETOOTH_DISTANCE = 100.0;
+    private static final double MAX_BLUETOOTH_DISTANCE = 12.0;
     private static final int MAX_SCAN_AMOUNT = 3;
 
     /**
