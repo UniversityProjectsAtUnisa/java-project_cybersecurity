@@ -5,18 +5,35 @@
  */
 package core.tokens;
 
+import src.AppServer.ServerUtils;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.io.Serializable;
+import java.security.InvalidKeyException;
+import java.security.Key;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 
 /**
  * Auth:         BASE64(id, data_creazione).HMACSHA256(BASE64(id, data_creazione), sale_2)
  * Notification: BASE64(id, data_scadenza).HMACSHA256(BASE64(id, data_scadenza),SHA256(sale_2 || SHA256(sale_1  || codice_fiscale)))
  */
-public class BaseToken {
+public class BaseToken implements Serializable{
     private String payload;
     private String sigma;
-    private Timestamp createdAt;
 
-    public BaseToken() {
+    public BaseToken(String payload, byte[] key) throws InvalidKeyException, NoSuchAlgorithmException {
+        this.payload = payload;
+        byte[] bytePayload = ServerUtils.toByteArray(payload);
+
+        Mac hMac = Mac.getInstance("HMacSHA256");
+        Key hMacKey = new SecretKeySpec(key, "HMacSHA256");
+        hMac.init(hMacKey);
+        hMac.update(bytePayload);
+        byte[] hMacRes = hMac.doFinal();
+
+        this.sigma = ServerUtils.toString(hMacRes);
     }
 
     public BaseToken(String raw) {
@@ -33,19 +50,4 @@ public class BaseToken {
         return sigma;
     }
 
-    public void setPayload(String payload) {
-        this.payload = payload;
-    }
-
-    public void setSigma(String sigma) {
-        this.sigma = sigma;
-    }
-
-    public Timestamp getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Timestamp createdAt) {
-        this.createdAt = createdAt;
-    }
 }

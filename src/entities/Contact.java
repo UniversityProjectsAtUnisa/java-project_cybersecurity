@@ -6,6 +6,7 @@
 package entities;
 
 import java.sql.Timestamp;
+import java.util.Arrays;
 
 /**
  *
@@ -13,7 +14,16 @@ import java.sql.Timestamp;
  */
 public class Contact extends ContactReport {
 
-    public Contact(byte[] id_segnalatore, byte[] id_segnalato, int durata, Timestamp data_inizio_contatto) {
-        super(id_segnalatore, id_segnalato, durata, data_inizio_contatto);
+    public Contact(byte[] reporterId, byte[] reportedId, int duration, Timestamp startContactDate) {
+        super(reporterId, reportedId, duration, startContactDate);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ContactReport that = (ContactReport) o;
+        return this.getDuration() == that.getDuration() && ((Arrays.equals(getReporterId(), that.getReportedId()) && Arrays.equals(getReportedId(), that.getReportedId())) ||
+                (Arrays.equals(getReporterId(), that.getReportedId()) && Arrays.equals(getReportedId(), that.getReporterId()))) && getStartContactDate().equals(that.getStartContactDate());
     }
 }
