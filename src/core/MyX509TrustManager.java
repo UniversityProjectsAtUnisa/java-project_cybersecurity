@@ -27,7 +27,6 @@ class MyX509TrustManager implements X509TrustManager {
     X509TrustManager x509TrustManager;
 
     MyX509TrustManager(String keyStoreFile, String password) throws Exception {
-        super();
         KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
 
         InputStream stream = MyX509TrustManager.class.getResourceAsStream(keyStoreFile);
@@ -36,7 +35,7 @@ class MyX509TrustManager implements X509TrustManager {
 
         TrustManagerFactory tmf
                 //                = TrustManagerFactory.getInstance("SunX509", "SunJSSE");
-                = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+                = TrustManagerFactory.getInstance("SunX509", "SunJSSE");
         tmf.init(ks);
 
         TrustManager tms[] = tmf.getTrustManagers();

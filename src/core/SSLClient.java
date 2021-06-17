@@ -47,8 +47,13 @@ public class SSLClient {
     }
 
     private SSLSocket createNewSocket() throws Exception {
-        SSLContext context = createSSLContext();
-        SSLSocketFactory factory = context.getSocketFactory();
+//        SSLContext context = createSSLContext();
+//        SSLSocketFactory factory = context.getSocketFactory();
+//        System.setProperty("javax.net.ssl.keyStore", "src/core/keys/official_certificates/HAKeystore.jks");
+//        System.setProperty("javax.net.ssl.trustStore", "src/core/keys/official_certificates/clientTruststore.jks");
+//        System.setProperty("javax.net.ssl.keyStorePassword", "changeit");
+//        System.setProperty("javax.net.ssl.trustStorePassword", "changeit");
+        SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
         SSLSocket newSocket = (SSLSocket) factory.createSocket("localhost", port);
         newSocket.startHandshake();
         System.out.println("DEBUG: client handshake eseguito con successo");
@@ -68,7 +73,7 @@ public class SSLClient {
         if (this.withClientAuthentication) {
             keyManagers = new X509KeyManager[]{new MyKeyManager("src/core/keys/official_certificates/HAKeystore.jks", "changeit")};
         }
-        sslContext.init(keyManagers, trustManagers, SecureRandom.getInstance("DEFAULT"));
+        sslContext.init(keyManagers, trustManagers, null);
         return sslContext;
     }
 
