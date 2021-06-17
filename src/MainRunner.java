@@ -17,5 +17,10 @@ public class MainRunner {
         }
 
         globalAppTimer.start();
+        /*
+        AppServer server = new AppServer();
+
+        System.out.println(server.getSalt1());
+         */
     }
 }
