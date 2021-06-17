@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package core;
 
 import core.tokens.AuthToken;
@@ -36,27 +31,17 @@ public class SSLClient {
     }
 
     public Response sendRequest(String endpoint, Serializable data, AuthToken token) throws RequestFailedException {
-        try {
-            SSLSocket socket = (SSLSocket) sslFactory.createSocket(hostIp, port);
-            Logger.getGlobal().info("STARTING HANDSHAKE");
+        try (SSLSocket socket = (SSLSocket) sslFactory.createSocket(hostIp, port)) {
             socket.startHandshake();
-            Logger.getGlobal().info("HANDSHAKE COMPLETED");
 
-            try (ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-                    ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream())) {
-                Logger.getGlobal().info("CREATING REQUEST");
+            try (ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream())) {
                 Request req = Request.make(endpoint, data, token);
-                Logger.getGlobal().info("REQ CREATED: " + req);
                 out.writeObject(req);
-                Logger.getGlobal().info("REQ SENT");
                 out.flush();
-                Logger.getGlobal().info("REQ COMPLETED: " + req);
-                Response res = (Response) in.readObject();
-                socket.close();
-                return res;
-            } catch(Exception e) {
-                Logger.getGlobal().warning("RequestFailed: " + e.getMessage());
-                throw e;
+            }
+
+            try (ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
+                return (Response) in.readObject();
             }
         } catch (IOException | ClassNotFoundException e) {
             Logger.getGlobal().warning("RequestFailed: " + e.getMessage());

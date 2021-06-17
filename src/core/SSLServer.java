@@ -1,16 +1,9 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package core;
 
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.util.logging.Logger;
 import java.util.logging.Level;
 import utils.Config;
@@ -38,35 +31,24 @@ public abstract class SSLServer {
     }
 
     public void start() {
-        ObjectInputStream in = null;
-        ObjectOutputStream out = null;
         Logger.getGlobal().info("SERVER STARTED");
         while (true) {
             try (SSLSocket acceptedSocket = (SSLSocket) serverSocket.accept()) {
                 Logger.getGlobal().info("ACCEPTED INCOMING CONNECTION");
-                System.out.println(acceptedSocket.getInputStream());
-                in = new ObjectInputStream(acceptedSocket.getInputStream());
-                out = new ObjectOutputStream(acceptedSocket.getOutputStream());
+                Request req;
 
-                Logger.getGlobal().info("READING REQUEST");
-                Request req = (Request) in.readObject();
-                Logger.getGlobal().info(req.toString());
-                Response res = handleRequest(req);
-
-                out.writeObject(res);
-                out.flush();
-            } catch (ClassNotFoundException | IOException e) {
-                Logger.getGlobal().log(Level.WARNING, e.getMessage());
-            } finally {
-                try {
-                    if (in != null) {
-                        in.close();
-                    }
-                    if (out != null) {
-                        out.close();
-                    }
-                } catch (IOException ignored) {
+                try (ObjectInputStream in = new ObjectInputStream(acceptedSocket.getInputStream())) {
+                    req = (Request) in.readObject();
+                    Logger.getGlobal().info(req.toString());
                 }
+
+                Response res = handleRequest(req);
+                try (ObjectOutputStream out = new ObjectOutputStream(acceptedSocket.getOutputStream())) {
+                    out.writeObject(res);
+                    out.flush();
+                }
+            } catch (IOException | ClassNotFoundException e) {
+                Logger.getGlobal().log(Level.WARNING, e.getMessage());
             }
         }
     }

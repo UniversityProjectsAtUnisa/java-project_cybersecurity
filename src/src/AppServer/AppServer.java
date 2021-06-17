@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package src.AppServer;
 import java.io.IOException;
 import java.security.InvalidKeyException;
@@ -47,25 +42,20 @@ import javax.crypto.SecretKey;
  *
  */
 
-public class AppServer extends SSLServer {
+public class AppServer {
 
     private String salt1 = "";
     private String salt2 = "";
     private Database database;
 
-    public AppServer() throws IOException {
-        super(Config.SERVER_KEYSTORE, Config.SERVER_TRUSTSTORE, "changeit", Config.APP_SERVER_PORT);
+    public AppServer() {
         this.database = new Database();
-        /*SecretKey key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks","changeit","salt1");
+        SecretKey key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks","changeit","salt1");
         this.salt1 = ServerUtils.toString(key1.getEncoded());
         SecretKey key2 = ServerUtils.loadFromKeyStore("./salts_keystore.jks","changeit","salt2");
-        this.salt2 = ServerUtils.toString(key2.getEncoded());*/
+        this.salt2 = ServerUtils.toString(key2.getEncoded());
     }
 
-    @Override
-    protected Response handleRequest(Request req) {
-        return Response.make("ciao");
-    }
 /*
     public <T> void handleRequest(Request req){
         <V> payload = req.getPayload();
