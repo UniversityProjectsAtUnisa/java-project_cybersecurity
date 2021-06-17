@@ -8,7 +8,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 
 
-public class MainRunner {
+public class AppRunner {
     public static void main(String[] args) {
         /*
         AppTimer globalAppTimer = AppTimer.getInstance();
