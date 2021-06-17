@@ -38,19 +38,17 @@ public abstract class SSLServer {
         ObjectOutputStream out = null;
         Logger.getGlobal().info("SERVER STARTED");
         while (true) {
-            try {
-                try (SSLSocket acceptedSocket = (SSLSocket) serverSocket.accept()) {
-                    Logger.getGlobal().info("ACCEPTED INCOMING CONNECTION");
-                    in = new ObjectInputStream(acceptedSocket.getInputStream());
-                    out = new ObjectOutputStream(acceptedSocket.getOutputStream());
+            try (SSLSocket acceptedSocket = (SSLSocket) serverSocket.accept()) {
+                Logger.getGlobal().info("ACCEPTED INCOMING CONNECTION");
+                in = new ObjectInputStream(acceptedSocket.getInputStream());
+                out = new ObjectOutputStream(acceptedSocket.getOutputStream());
 
-                    Request req = (Request) in.readObject();
-                    Logger.getGlobal().info(req.toString());
-                    Response res = handleRequest(req);
+                Request req = (Request) in.readObject();
+                Logger.getGlobal().info(req.toString());
+                Response res = handleRequest(req);
 
-                    out.writeObject(res);
-                    out.flush();
-                }
+                out.writeObject(res);
+                out.flush();
             } catch (ClassNotFoundException | IOException e) {
                 Logger.getGlobal().log(Level.WARNING, e.getMessage());
             } finally {
