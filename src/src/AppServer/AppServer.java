@@ -20,6 +20,10 @@ import entities.Contact;
 import entities.ContactReport;
 import entities.User;
 import entities.Notification;
+import exceptions.DeletionFailedException;
+import exceptions.InsertFailedException;
+import exceptions.NotFoundException;
+import exceptions.UpdateException;
 import java.io.Serializable;
 import java.util.logging.Level;
 import utils.Config;
@@ -30,6 +34,7 @@ import javax.xml.crypto.Data;
 import utils.ContactReportMessage;
 import utils.Credentials;
 import java.text.MessageFormat;
+import java.util.stream.Collectors;
 
 /**
  *
@@ -58,6 +63,7 @@ public class AppServer extends SSLServer {
         this.salt2 = ServerUtils.toString(key2.getEncoded());
     }
 
+    @Override
     public Response handleRequest(Request req) {
         // UseNotification è chiamato dall'HA
         // TUtte le chiamate sono autenticate tranne login e register
@@ -78,6 +84,9 @@ public class AppServer extends SSLServer {
                     throw new AuthenticationException("The authentication token is not valid");
                 }
                 loggedUser = this.database.findUser(token.getId());
+                if (loggedUser == null) {
+                    throw new AuthenticationException("User not found");
+                }
             }
 
             Logger.getGlobal().info(endpointName);
@@ -94,9 +103,9 @@ public class AppServer extends SSLServer {
                     break;
                 case "createReport":
                     ContactReportMessage createReportData = (ContactReportMessage) req.getPayload();
-                    data = this.createReport(createReportData.getIdUserToReport(), createReportData.getDuration(), createReportData.getStartDateTime(), loggedUser);
+                    data = this.createReport(createReportData.getIdUserToReport(), createReportData.getDuration(), createReportData.getStartDate(), loggedUser);
                     break;
-                case "getNotifications":
+                case "getNotifications": 
                     data = this.getNotifications(loggedUser);
                     break;
                 case "getNotificationSuspensionDate":
@@ -121,48 +130,65 @@ public class AppServer extends SSLServer {
         }
     }
 
-    public AuthToken login(String cf, String password) throws NoSuchAlgorithmException, InvalidKeyException {
-        User user = this.database.findUser(ServerUtils.toByteArray(cf));
+    public AuthToken login(String cf, String password) throws NoSuchAlgorithmException, InvalidKeyException, AuthenticationException {
+        byte[] cfBytes = ServerUtils.toByteArray(cf);
+        byte[] hashedCf = encryptCf(cfBytes);
+        User user = this.database.findUser(hashedCf);
         if (user == null) {
-            return null;
+            throw new AuthenticationException("Invalid credentials");
         }
         byte[] userSalt = user.getUserSalt();
-        byte[] passwordBytes = password.getBytes();
-        byte[] passwordConcat = ServerUtils.concatByteArray(passwordBytes, userSalt);
+        byte[] passwordBytes = ServerUtils.toByteArray(password);
+        byte[] hashedPassword = encryptPassword(passwordBytes, userSalt);
 
-        MessageDigest md = MessageDigest.getInstance("SHA-256");
-        byte[] passwordHashed = md.digest(passwordConcat);
-        if (Arrays.equals(passwordHashed, user.getPassword())) {
+        if (Arrays.equals(hashedPassword, user.getHashedPassword())) {
             int id = user.getId();
             AuthToken token = new AuthToken(id, this.getSalt2());
-            this.database.updateUser(user.getCf(), token.getCreatedAt(), null, null);
+            if (this.database.updateUser(user.getHashedCf(), token.getCreatedAt(), null, null) == null) {
+                throw new NotFoundException("User not found");
+            }
             return token;
         }
         return null;
     }
 
-    public boolean register(String cf, String password) throws NoSuchAlgorithmException {
+    public boolean register(String cf, String password) throws NoSuchAlgorithmException, InsertFailedException {
         /* if (!HealthApi.checkCf(cf)){
             return false;
         }*/
-        byte[] passwordBytes = password.getBytes();
         byte[] userSalt = new byte[32];
         new SecureRandom().nextBytes(userSalt);
-        byte[] passwordConcat = ServerUtils.concatByteArray(passwordBytes, userSalt);
 
-        MessageDigest md = MessageDigest.getInstance("SHA-256");
-        byte[] passwordHashed = md.digest(passwordConcat);
+        byte[] passwordBytes = password.getBytes();
+        byte[] hashedPassword = encryptPassword(passwordBytes, userSalt);
 
-        this.database.addUser(ServerUtils.toByteArray(cf), passwordHashed, userSalt);
+        byte[] cfBytes = ServerUtils.toByteArray(cf);
+        byte[] hashedCf = encryptCf(cfBytes);
+        if (!this.database.addUser(hashedCf, hashedPassword, userSalt)) {
+            throw new InsertFailedException("User registration failed");
+        }
 
         return true;
     }
 
-    public boolean createReport(int id, int duration, Timestamp date, User loggedUser) throws NoSuchAlgorithmException, InvalidKeyException {
+    private byte[] encryptPassword(byte[] plainPassword, byte[] userSalt) throws NoSuchAlgorithmException {
+        byte[] combinedSalt = ServerUtils.concatByteArray(userSalt, ServerUtils.toByteArray(salt1));
+        return ServerUtils.encryptWithSalt(plainPassword, combinedSalt);
+    }
+
+    private byte[] encryptCf(byte[] plainCf) throws NoSuchAlgorithmException {
+        return ServerUtils.encryptWithSalt(plainCf, ServerUtils.toByteArray(salt1));
+    }
+
+    public boolean createReport(int id, int duration, Timestamp date, User loggedUser) throws NoSuchAlgorithmException, InvalidKeyException, NotFoundException, InsertFailedException, DeletionFailedException {
         System.out.println("CONTATTI NEL DB: " + this.database.contacts.size());
         System.out.println("REPORTS NEL DB: " + this.database.contactReports.size());
-        byte[] cfReporter = loggedUser.getCf();
-        byte[] cfReported = this.database.findUser(id).getCf();
+        byte[] cfReporter = loggedUser.getHashedCf();
+        User reportedUser = this.database.findUser(id);
+        if (reportedUser == null) {
+            throw new NotFoundException("Reported user not found");
+        }
+        byte[] cfReported = reportedUser.getHashedCf();
 
         // FASE 1: Ricerca report nel database
         // FASE 2: Individuare sovrapposizioni
@@ -170,7 +196,6 @@ public class AppServer extends SSLServer {
         // FASE 3: Creare il nuovo report se è il più recente
         // FASE 4: Cancellare i vecchi report
         //        
-        //
         // FASE 1
         // Se il reporter sono io e il reported è la persona che ho appena visto
         // Certo tutti i report in cui il reported ha visto il reporter
@@ -186,8 +211,12 @@ public class AppServer extends SSLServer {
         // FASE 2.1
         // Per ogni sovrapposizione così individuata creo un nuovo contatto e
         // lo inserisco nel database.
-        overlaps.forEach(this.database::addContact);
-                
+        for (ContactReport overlap : overlaps) {
+            if (!this.database.addContact(overlap)) {
+                throw new InsertFailedException("Contact creation failed");
+            }
+        }
+
         // FASE 3
         // Vedo se esiste un report più recente di quello che sto per creare.
         // Un report più recente è un report che finisce dopo.
@@ -201,91 +230,73 @@ public class AppServer extends SSLServer {
 
         boolean anyReportIsMoreRecent = mostRecentReport.getEndDate().after(newReport.getEndDate());
         if (!anyReportIsMoreRecent) {
-            this.database.addContactReport(newReport);
+            if (!this.database.addContactReport(newReport)) {
+                throw new InsertFailedException("Contact report creation failed");
+            }
         }
 
         // FASE 4
         // Cancello tutti i report tranne il più recente
         for (ContactReport r : reports) {
             if (!r.equals(mostRecentReport)) {
-                this.database.removeContactReport(r.getReporterId(), r.getReportedId(), r.getStartDate());
+                if(!this.database.removeContactReport(r.getReporterId(), r.getReportedId(), r.getStartDate())) {
+                    throw new DeletionFailedException("Impossible to remove contact");
+                }
             }
         }
 
         return true;
-
-//        System.out.println("Reports found " + reports.size());
-//
-//        Timestamp maxContactEndDate = new Timestamp(0);
-//
-//        Timestamp timestampReportEndDate = ServerUtils.addMillis(date, duration);
-//        Timestamp timestampAfterSubtraction = ServerUtils.minusMillis(ServerUtils.getNow(), 15 * 60);
-//        // algorithm
-//        for (ContactReport c : reports) {
-//
-//            Timestamp timestampCEndDate = ServerUtils.addMillis(c.getStartContactDate(), c.getDuration());
-//            maxContactEndDate = ServerUtils.maxTimestamp(maxContactEndDate, timestampCEndDate);
-//
-//            if ((!c.getStartContactDate().after(date) && !date.after(timestampCEndDate)
-//                    || !c.getStartContactDate().before(date) && !timestampReportEndDate.before(c.getStartContactDate()))
-//                    && !c.getStartContactDate().before(timestampAfterSubtraction)) {
-//
-//                if (timestampReportEndDate.after(timestampCEndDate)) {
-//                    this.database.removeContactReport(cfReported, cfReporter, c.getStartContactDate());
-//                }
-//
-//                Timestamp maxInit = ServerUtils.maxTimestamp(date, c.getStartContactDate());
-//                Timestamp minEnd = ServerUtils.minTimestamp(timestampReportEndDate, timestampCEndDate);
-//                int durationNewContact = ServerUtils.diffTimestampSec(minEnd, maxInit);
-//
-//                System.out.println("CREAZIONE CONTATTO");
-//                Logger.getGlobal().log(Level.INFO, MessageFormat.format("Contact(cfReporter={0}, cfReported={1}, durationNewContact={2}, maxInit={3})", cfReporter, cfReported, durationNewContact, maxInit));
-//                this.database.addContact(cfReporter, cfReported, durationNewContact, maxInit);
-//
-//            }
-//        }
-//        if (timestampReportEndDate.after(maxContactEndDate)) {
-//            System.out.println("CI ENTRA");
-//            this.database.addContactReport(cfReporter, cfReported, duration, date);
-//        }
-//
-//        return true;
     }
 
     public LinkedList<String> getNotifications(User loggedUser) throws NoSuchAlgorithmException, InvalidKeyException {
-        List<Notification> dbTokens = this.database.searchUserNotifications(loggedUser.getId());
-        LinkedList<String> tokens = new LinkedList<>();
-
-        for (Notification dbToken : dbTokens) {
-            tokens.add(dbToken.getCode());
-        }
-
-        return tokens;
+        return this.database
+                .searchUserNotifications(loggedUser.getId())
+                .stream()
+                .map(notification -> notification.getCode())
+                .collect(Collectors.toCollection(LinkedList::new));
     }
 
-    public boolean useNotification(String code) {
+    public boolean useNotification(String code) throws NotFoundException, UpdateException {
+        // TODO: MANCA
         Notification notification = this.database.searchNotification(code);
         if (notification == null) {
-            return false;
+            throw new NotFoundException("Notification with given code not found");
         }
-        return this.database.updateNotification(code, ServerUtils.getNow()) != null;
+        if(this.database.updateNotification(code, ServerUtils.getNow()) == null){
+            throw new UpdateException("Impossible to update notification");
+        }
+        return true;
     }
 
-    public Timestamp getNotificationSuspensionDate(String code, User loggedUser) throws AuthenticationException {
+    public Timestamp getNotificationSuspensionDate(String code, User loggedUser) throws AuthenticationException, NotFoundException {
         Notification notification = this.database.searchNotification(code);
+        if (notification == null) {
+            throw new NotFoundException("Notification with given code not found");
+        }
         if (notification.getId() != loggedUser.getId()) {
             throw new AuthenticationException("The logged user does not own the selected notificationToken");
         }
         return notification.getSuspensionDate();
     }
 
-    public boolean notifyPositiveUser(String cf) throws NoSuchAlgorithmException, InvalidKeyException {
-        User user = this.database.findUser(ServerUtils.toByteArray(cf));
-        List<Contact> contacts = this.database.searchContactsOfUser(user.getCf());
-        user.setLastPositiveSwabDate(ServerUtils.getNow());
-        this.database.updateUser(user.getCf(), null, null, ServerUtils.getNow());
+    public boolean notifyPositiveUser(String cf) throws NoSuchAlgorithmException, InvalidKeyException, NotFoundException, UpdateException {
+        // TODO: MANCA
+        byte[] cfBytes = ServerUtils.toByteArray(cf);
+        byte[] hashedCf = encryptCf(cfBytes);
+        User user = this.database.findUser(hashedCf);
+        if (user == null) {
+            throw new NotFoundException("User not found");
+        }
+        List<Contact> contacts = this.database
+                .searchContactsOfUser(hashedCf)
+                .stream()
+                .filter(contact -> contact.getEndDate().after(ServerUtils.getLastValidDateForContact()))
+                .toList();
+        if (this.database.updateUser(hashedCf, null, null, ServerUtils.getNow()) == null) {
+            throw new UpdateException("Impossibile to update user");
+        }
 
-        //algorithm
+        // algorithm
         Map<User, Integer> durationMap = new HashMap<>();
         for (Contact c : contacts) {
             User user_i = this.database.findUser(c.getReporterId());
@@ -310,34 +321,34 @@ public class AppServer extends SSLServer {
             }
 
         }
-        //end algorithm
-        for (Map.Entry<User, Integer> entry : durationMap.entrySet()) {
+        // end algorithm
+        durationMap.entrySet().forEach(entry -> {
             int value = entry.getValue();
             User u = entry.getKey();
             if (value > Config.RISK_MINUTES) {
                 NotificationToken token = null;
                 try {
                     Timestamp expireDate = Timestamp.valueOf(ServerUtils.getNow().toLocalDateTime().plusDays(Config.EXPIRE_DAYS));
-                    token = new NotificationToken(u.getId(), expireDate, ServerUtils.toString(u.getCf()),
+                    token = new NotificationToken(u.getId(), expireDate, ServerUtils.toString(u.getHashedCf()),
                             this.getSalt1(), this.getSalt2());
                     String code = token.getCode();
-                    this.database.addNotification(code, u.getId());
-                    this.database.updateUser(u.getCf(), null, ServerUtils.getNow(), null);
+                    this.database.addNotification(code);
+                    this.database.updateUser(u.getHashedCf(), null, ServerUtils.getNow(), null);
                 } catch (NoSuchAlgorithmException | InvalidKeyException e) {
                     e.printStackTrace();
                 }
             }
-        }
+        });
 
         return true;
 
     }
 
-    public String getSalt1() {
+    private String getSalt1() {
         return salt1;
     }
 
-    public String getSalt2() {
+    private String getSalt2() {
         return salt2;
     }
 }
