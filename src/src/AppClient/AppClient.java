@@ -46,6 +46,7 @@ public class AppClient {
 
     public boolean login() {
         token = serverApi.login(getTmpCredentials());
+        
         if (token == null)
             return false;
         appState = AppClientState.LOGGED;
