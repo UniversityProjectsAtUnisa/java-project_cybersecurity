@@ -13,21 +13,12 @@ import java.io.Serializable;
 import java.sql.Timestamp;
 import java.util.List;
 
-public class ServerApiService {
+public class ServerApiService extends BaseApiService {
 
     private static final String PASSWORD = "changeit";
-    private final SSLClient client;
 
     public ServerApiService() {
-        client = new SSLClient(null, Config.CLIENT_TRUSTSTORE, PASSWORD, Config.APP_SERVER_IP, Config.APP_SERVER_PORT);
-    }
-
-    private Response sendRequest(String endpoint, Serializable data, AuthToken token, String errMsg) {
-        Response res = client.sendRequest(endpoint, data, token);
-        if (!res.isSuccess()) {
-            throw new RequestFailedException("REQUEST FAILED: " + errMsg);
-        }
-        return res;
+        super(null, Config.CLIENT_TRUSTSTORE, PASSWORD, Config.APP_SERVER_IP, Config.APP_SERVER_PORT);
     }
 
     public boolean register(Credentials credentials) {

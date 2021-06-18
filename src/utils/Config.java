@@ -10,6 +10,7 @@ public class Config {
 
     public static final String APP_SERVER_IP = "localhost";
     public static final int APP_SERVER_PORT = 7007;
+    public static final int RESTRICTED_APP_SERVER_PORT = 7008;
 
     public static final String HA_SERVER_IP = "localhost";
     public static final int HA_SERVER_PORT = 5763;

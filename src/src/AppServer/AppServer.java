@@ -44,16 +44,28 @@ import java.text.MessageFormat;
  * notifyPositiveUser({codice_fiscale}) -> boolean
  *
  */
-public class AppServer extends SSLServer {
+public class AppServer {
 
     private String salt1 = "";
     private String salt2 = "";
     private final Database database;
     private final HAApiService healthApiService;
+    private final SSLServer publicServer, restrictedServer;
 
     public AppServer(String password) throws IOException {
-        super(Config.SERVER_KEYSTORE, Config.SERVER_TRUSTSTORE, password, Config.APP_SERVER_PORT);
-        healthApiService = new HAApiService(password);
+        publicServer = new SSLServer(Config.SERVER_KEYSTORE, Config.SERVER_TRUSTSTORE, password, Config.APP_SERVER_PORT) {
+            @Override
+            protected Response handleRequest(Request req) {
+                return publicHandleRequest(req);
+            }
+        };
+        restrictedServer = new SSLServer(Config.SERVER_KEYSTORE, Config.SERVER_TRUSTSTORE, password, Config.RESTRICTED_APP_SERVER_PORT, true) {
+            @Override
+            protected Response handleRequest(Request req) {
+                return restrictedHandleRequest(req);
+            }
+        };
+        healthApiService = new HAApiService();
         this.database = new Database();
         SecretKey key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "salt1");
         this.salt1 = ServerUtils.toString(key1.getEncoded());
@@ -61,7 +73,23 @@ public class AppServer extends SSLServer {
         this.salt2 = ServerUtils.toString(key2.getEncoded());
     }
 
-    public Response handleRequest(Request req) {
+    public void start() {
+        new Thread(restrictedServer::start).start();
+        publicServer.start();
+    }
+
+    public synchronized Response restrictedHandleRequest(Request req) {
+        try {
+            String cf = (String) req.getPayload();
+            boolean success = notifyPositiveUser(cf);
+            return Response.make(success);
+        } catch(Exception e) {
+            Logger.getGlobal().warning("Server Internal Error: " + e.getMessage());
+            return Response.error("Server Internal Error");
+        }
+    }
+
+    public synchronized Response publicHandleRequest(Request req) {
         // UseNotification è chiamato dall'HA
         // TUtte le chiamate sono autenticate tranne login e register
         // Nel server dell'HA c'è notifyPositiveUser e useNotification
