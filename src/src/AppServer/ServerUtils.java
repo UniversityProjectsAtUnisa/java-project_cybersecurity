@@ -147,21 +147,21 @@ public class ServerUtils {
         }
     }
 
-    public static int diffTimestampSec(Timestamp t1, Timestamp t2)  {
+    public static int diffTimestampMillis(Timestamp t1, Timestamp t2)  {
         long timeT1 = t1.getTime();
         long timeT2 = t2.getTime();
-        long diff = Math.round(Math.abs(timeT1 - timeT2)/1000);
+        long diff = Math.round(Math.abs(timeT1 - timeT2));
         return (int) diff;
     }
 
-    public static Timestamp addSeconds(Timestamp startDate, int seconds){
-        LocalDateTime cEndDate = startDate.toLocalDateTime().plusSeconds(seconds);
+    public static Timestamp addMillis(Timestamp startDate, int millis){
+        LocalDateTime cEndDate = startDate.toLocalDateTime().plusNanos(millis * 1000);
         String strCEndDate = cEndDate.format(formatter);
         return Timestamp.valueOf(strCEndDate);
     }
 
-    public static Timestamp minusSeconds(Timestamp startDate, int seconds){
-        LocalDateTime cEndDate = startDate.toLocalDateTime().minusSeconds(seconds);
+    public static Timestamp minusMillis(Timestamp startDate, int millis){
+        LocalDateTime cEndDate = startDate.toLocalDateTime().minusNanos(millis * 1000);
         String strCEndDate = cEndDate.format(formatter);
         return Timestamp.valueOf(strCEndDate);
     }

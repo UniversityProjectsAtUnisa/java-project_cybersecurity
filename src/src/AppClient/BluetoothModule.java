@@ -7,7 +7,7 @@ import java.util.Set;
 
 public class BluetoothModule {
 
-    private static final double MAX_BLUETOOTH_DISTANCE = 12.0;
+    private static final double MAX_BLUETOOTH_DISTANCE = 3.0;
     private final int maxRandomUsers;
 
     public BluetoothModule() {

@@ -21,6 +21,7 @@ import entities.ContactReport;
 import entities.User;
 import entities.Notification;
 import java.io.Serializable;
+import java.util.logging.Level;
 import utils.Config;
 
 import javax.crypto.SecretKey;
@@ -28,6 +29,7 @@ import javax.naming.AuthenticationException;
 import javax.xml.crypto.Data;
 import utils.ContactReportMessage;
 import utils.Credentials;
+import java.text.MessageFormat;
 
 /**
  *
@@ -61,6 +63,7 @@ public class AppServer extends SSLServer {
         // TUtte le chiamate sono autenticate tranne login e register
         // Nel server dell'HA c'è notifyPositiveUser e useNotification
         // Nomi endpoint tutti maiuscoli
+        // Sistema verify di notificationToken (useNotification): il cf a disposizione è hashato
         String endpointName = req.getEndpointName();
 
         User loggedUser = null;
@@ -107,7 +110,7 @@ public class AppServer extends SSLServer {
 //                case "useNotification":
 //                    response = this.useNotification(payload.getCode());
 //                    break;
-            };
+            }
             return Response.make(data);
         } catch (AuthenticationException e) {
             Logger.getGlobal().warning(e.getMessage());
@@ -139,7 +142,7 @@ public class AppServer extends SSLServer {
     }
 
     public boolean register(String cf, String password) throws NoSuchAlgorithmException {
-        /* if (!HealhApi.checkCf(cf)){
+        /* if (!HealthApi.checkCf(cf)){
             return false;
         }*/
         byte[] passwordBytes = password.getBytes();
@@ -156,48 +159,97 @@ public class AppServer extends SSLServer {
     }
 
     public boolean createReport(int id, int duration, Timestamp date, User loggedUser) throws NoSuchAlgorithmException, InvalidKeyException {
-
+        System.out.println("CONTATTI NEL DB: " + this.database.contacts.size());
+        System.out.println("REPORTS NEL DB: " + this.database.contactReports.size());
         byte[] cfReporter = loggedUser.getCf();
         byte[] cfReported = this.database.findUser(id).getCf();
 
-        List<ContactReport> reports = this.database.searchContactReportOfReported(cfReporter);
+        // FASE 1: Ricerca report nel database
+        // FASE 2: Individuare sovrapposizioni
+        // FASE 2.1: Creare i contatti per le sovrapposizioni
+        // FASE 3: Creare il nuovo report se è il più recente
+        // FASE 4: Cancellare i vecchi report
+        //        
+        //
+        // FASE 1
+        // Se il reporter sono io e il reported è la persona che ho appena visto
+        // Certo tutti i report in cui il reported ha visto il reporter
+        // Ovvero tutti i report in cui la persona che ho appena visto ha visto me
+        List<ContactReport> reports = this.database.searchContactReportsOfUsers(cfReported, cfReporter);
 
-        if (reports.isEmpty()) {
-            this.database.addContactReport(cfReporter, cfReported, duration, date);
-            return true;
-        }
+        // FASE 2
+        // Individuo tutte le sovrapposizioni tra il report attuale ed i report
+        // Individuati nella FASE 1
+        ContactReport newReport = new ContactReport(cfReporter, cfReported, duration, date);
+        List<ContactReport> overlaps = reports.stream().map(report -> report.findOverlapWith(newReport)).filter(report -> report != null).toList();
 
-        Timestamp cEndDateMax = new Timestamp(0);
-
-        Timestamp timestampReportEndDate = ServerUtils.addSeconds(date, duration);
-        Timestamp timestampAfterSubtraction = ServerUtils.minusSeconds(ServerUtils.getNow(), 15*60);
-        //algorithm
-        for (ContactReport c : reports) {
-
-            Timestamp timestampCEndDate = ServerUtils.addSeconds(c.getStartContactDate(), c.getDuration());
-            cEndDateMax = ServerUtils.maxTimestamp(cEndDateMax, timestampCEndDate);
-
-            if ((!c.getStartContactDate().after(date) && !date.after(timestampCEndDate)
-                    || !c.getStartContactDate().before(date) && !timestampReportEndDate.before(c.getStartContactDate()))
-                    && !c.getStartContactDate().before(timestampAfterSubtraction)) {
-
-                if (timestampReportEndDate.after(timestampCEndDate)) {
-                    this.database.removeContactReport(c.getReporterId(), c.getReportedId(), c.getStartContactDate());
-                }
-
-                Timestamp maxInit = ServerUtils.maxTimestamp(date, c.getStartContactDate());
-                Timestamp minEnd = ServerUtils.minTimestamp(timestampReportEndDate, timestampCEndDate);
-                int durationNewContact = ServerUtils.diffTimestampSec(minEnd, maxInit);
-
-                this.database.addContact(cfReporter, cfReported, durationNewContact, maxInit);
-
+        // FASE 2.1
+        // Per ogni sovrapposizione così individuata creo un nuovo contatto e
+        // lo inserisco nel database.
+        overlaps.forEach(this.database::addContact);
+                
+        // FASE 3
+        // Vedo se esiste un report più recente di quello che sto per creare.
+        // Un report più recente è un report che finisce dopo.
+        // Se NON esiste un report più recente inserisco il report corrente nel database.
+        ContactReport mostRecentReport = newReport;
+        for (ContactReport r : reports) {
+            if (r.getEndDate().after(mostRecentReport.getEndDate())) {
+                mostRecentReport = r;
             }
         }
-        if (!timestampReportEndDate.before(cEndDateMax)) {
-            this.database.addContactReport(cfReporter, cfReported, duration, date);
+
+        boolean anyReportIsMoreRecent = mostRecentReport.getEndDate().after(newReport.getEndDate());
+        if (!anyReportIsMoreRecent) {
+            this.database.addContactReport(newReport);
+        }
+
+        // FASE 4
+        // Cancello tutti i report tranne il più recente
+        for (ContactReport r : reports) {
+            if (!r.equals(mostRecentReport)) {
+                this.database.removeContactReport(r.getReporterId(), r.getReportedId(), r.getStartDate());
+            }
         }
 
         return true;
+
+//        System.out.println("Reports found " + reports.size());
+//
+//        Timestamp maxContactEndDate = new Timestamp(0);
+//
+//        Timestamp timestampReportEndDate = ServerUtils.addMillis(date, duration);
+//        Timestamp timestampAfterSubtraction = ServerUtils.minusMillis(ServerUtils.getNow(), 15 * 60);
+//        // algorithm
+//        for (ContactReport c : reports) {
+//
+//            Timestamp timestampCEndDate = ServerUtils.addMillis(c.getStartContactDate(), c.getDuration());
+//            maxContactEndDate = ServerUtils.maxTimestamp(maxContactEndDate, timestampCEndDate);
+//
+//            if ((!c.getStartContactDate().after(date) && !date.after(timestampCEndDate)
+//                    || !c.getStartContactDate().before(date) && !timestampReportEndDate.before(c.getStartContactDate()))
+//                    && !c.getStartContactDate().before(timestampAfterSubtraction)) {
+//
+//                if (timestampReportEndDate.after(timestampCEndDate)) {
+//                    this.database.removeContactReport(cfReported, cfReporter, c.getStartContactDate());
+//                }
+//
+//                Timestamp maxInit = ServerUtils.maxTimestamp(date, c.getStartContactDate());
+//                Timestamp minEnd = ServerUtils.minTimestamp(timestampReportEndDate, timestampCEndDate);
+//                int durationNewContact = ServerUtils.diffTimestampSec(minEnd, maxInit);
+//
+//                System.out.println("CREAZIONE CONTATTO");
+//                Logger.getGlobal().log(Level.INFO, MessageFormat.format("Contact(cfReporter={0}, cfReported={1}, durationNewContact={2}, maxInit={3})", cfReporter, cfReported, durationNewContact, maxInit));
+//                this.database.addContact(cfReporter, cfReported, durationNewContact, maxInit);
+//
+//            }
+//        }
+//        if (timestampReportEndDate.after(maxContactEndDate)) {
+//            System.out.println("CI ENTRA");
+//            this.database.addContactReport(cfReporter, cfReported, duration, date);
+//        }
+//
+//        return true;
     }
 
     public LinkedList<String> getNotifications(User loggedUser) throws NoSuchAlgorithmException, InvalidKeyException {
@@ -246,13 +298,13 @@ public class AppServer extends SSLServer {
             Timestamp timestampAfterSubtraction = Timestamp.valueOf(afterSubtraction);
             if (user_i.getLastPositiveSwabDate() != null
                     && (user_i.getLastPositiveSwabDate().after(timestampAfterSubtraction)
-                    || c.getStartContactDate().after(user_i.getLastPositiveSwabDate()))) {
+                    || c.getStartDate().after(user_i.getLastPositiveSwabDate()))) {
                 int prevValue = durationMap.get(user_j) == null ? 0 : durationMap.get(user_j);
                 durationMap.put(user_j, (Integer) prevValue + c.getDuration());
             }
             if (user_j.getLastPositiveSwabDate() != null
                     && (user_j.getLastPositiveSwabDate().after(timestampAfterSubtraction)
-                    || c.getStartContactDate().after(user_j.getLastPositiveSwabDate()))) {
+                    || c.getStartDate().after(user_j.getLastPositiveSwabDate()))) {
                 int prevValue = durationMap.get(user_i) == null ? 0 : durationMap.get(user_i);
                 durationMap.put(user_i, (Integer) prevValue + c.getDuration());
             }

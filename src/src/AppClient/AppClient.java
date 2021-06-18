@@ -51,7 +51,7 @@ public class AppClient {
             return false;
         appState = AppClientState.LOGGED;
         AppTimer.getInstance().subscribe(this);
-        // startNotificationTimer();
+        startNotificationTimer();
         return true;
     }
 
@@ -114,7 +114,7 @@ public class AppClient {
 
     private void terminateContact(int id) {
         ContactCounter contactCounter = userCounter.remove(id);
-        System.out.printf("ReportContact(id=%d, count=%d, startDate=%s)%n", id, contactCounter.count, contactCounter.startDate);
+        System.out.printf("By client %d, ReportContact(id=%d, count=%d, startDate=%s)%n", token.getId(), id, contactCounter.count, contactCounter.startDate);
         serverApi.reportContact(id, contactCounter.count * Config.TC, contactCounter.startDate, token);
     }
 }

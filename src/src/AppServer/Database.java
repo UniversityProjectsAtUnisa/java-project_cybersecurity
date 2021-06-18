@@ -11,6 +11,7 @@ import entities.Notification;
 import entities.User;
 
 import java.sql.Timestamp;
+import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -18,6 +19,8 @@ import java.util.TreeSet;
 import java.util.HashMap;
 import java.util.Arrays;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -25,10 +28,11 @@ import java.util.List;
 public class Database {
 
     private static int usersCount = 0;
-    private final HashMap<Integer, User> users = new HashMap<>();
-    private final TreeSet<ContactReport> contactReports = new TreeSet<>();
-    private final TreeSet<Contact> contacts = new TreeSet<>();
-    private final TreeSet<Notification> notifications = new TreeSet<>();
+    // TODO: Rimetti private
+    final HashMap<Integer, User> users = new HashMap<>();
+    final TreeSet<ContactReport> contactReports = new TreeSet<>();
+    final TreeSet<Contact> contacts = new TreeSet<>();
+    final TreeSet<Notification> notifications = new TreeSet<>();
 
     public boolean addUser(byte[] cf, byte[] password, byte[] userSalt) {
         return users.putIfAbsent(++usersCount, new User(usersCount, cf, password, userSalt)) == null;
@@ -75,16 +79,20 @@ public class Database {
         return contactReports.add(new ContactReport(reporterId, reportedId, duration, startContactDate));
     }
 
+    public boolean addContactReport(ContactReport report) {
+        return contactReports.add(report);
+    }
+
     public ContactReport searchContactReport(byte[] reporterId, byte[] reportedId, Timestamp startContactDate) {
         for (ContactReport contactReport : contactReports) {
-            if (Arrays.equals(contactReport.getReporterId(), reporterId) && Arrays.equals(contactReport.getReportedId(), reportedId) && contactReport.getStartContactDate().equals(startContactDate)) {
+            if (Arrays.equals(contactReport.getReporterId(), reporterId) && Arrays.equals(contactReport.getReportedId(), reportedId) && contactReport.getStartDate().equals(startContactDate)) {
                 return contactReport;
             }
         }
         return null;
     }
 
-    public List<ContactReport> searchContactReportOfUsers(byte[] reporterId, byte[] reportedId) {
+    public List<ContactReport> searchContactReportsOfUsers(byte[] reporterId, byte[] reportedId) {
         return contactReports
                 .stream()
                 .filter(report -> Arrays.equals(report.getReporterId(), reporterId)
@@ -104,9 +112,19 @@ public class Database {
         return contacts.add(new Contact(reporterId, reportedId, duration, startContactDate));
     }
 
-    public Contact searchContact(byte[] reporterId, byte[] reportedId, Timestamp startContactDate) {
+    public boolean addContact(ContactReport report) {
+        System.out.println("CREAZIONE CONTATTO");
+        Logger.getGlobal().log(Level.INFO, "Contact: {0}", report.toString());
+        return contacts.add(new Contact(report));
+    }
+
+    public Contact searchContact(byte[] reporterId, byte[] reportedId, Timestamp startDate) {
         for (Contact contact : contacts) {
-            if (contact.getReporterId() == reporterId && contact.getReportedId() == reportedId && contact.getStartContactDate() == startContactDate) {
+            // La data di inizio è uguale
+            if (contact.getStartDate().equals(startDate)
+                    // Il contatto è bidirezionale
+                    && (Arrays.equals(contact.getReporterId(), reporterId) && Arrays.equals(contact.getReportedId(), reportedId)
+                    || (Arrays.equals(contact.getReporterId(), reportedId) && Arrays.equals(contact.getReportedId(), reporterId)))) {
                 return contact;
             }
         }
