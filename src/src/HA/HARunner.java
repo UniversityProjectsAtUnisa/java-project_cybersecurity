@@ -1,9 +1,9 @@
-package src.AppServer;
+package src.HA;
 
 import java.io.IOException;
 
-public class ServerRunner {
+public class HARunner {
     public static void main(String[] args) throws IOException {
-        new AppServer("changeit").start();
+        new HAServer("changeit").start();
     }
 }

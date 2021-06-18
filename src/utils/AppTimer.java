@@ -36,7 +36,6 @@ public class AppTimer {
 
     private void onTimeout() {
         Logger.getGlobal().info("GlobalTimer Timeout");
-        System.out.println(clients.size());
         for (AppClient appClient: clients) {
             appClient.scanAndEmit();
         }
