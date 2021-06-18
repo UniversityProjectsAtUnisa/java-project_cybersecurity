@@ -11,6 +11,7 @@ import java.util.Collections;
 import src.AppServer.ServerUtils;
 import exceptions.InvalidContactException;
 import java.text.MessageFormat;
+import java.util.Objects;
 
 /**
  *
@@ -24,7 +25,7 @@ public class ContactReport implements Comparable<ContactReport> {
     private final Timestamp startDate;
 
     public ContactReport(byte[] reporterId, byte[] reportedId, int duration, Timestamp startDate) {
-        if (reporterId.equals(reportedId)) {
+        if (Arrays.equals(reporterId, reportedId)) {
             throw new InvalidContactException("Reporter and reported cannot be the same user");
         }
         this.reporterId = reporterId;
@@ -78,6 +79,16 @@ public class ContactReport implements Comparable<ContactReport> {
         }
         ContactReport that = (ContactReport) o;
         return duration == that.duration && Arrays.equals(reporterId, that.reporterId) && Arrays.equals(reportedId, that.reportedId) && startDate.equals(that.startDate);
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 7;
+        hash = 61 * hash + Arrays.hashCode(this.reporterId);
+        hash = 61 * hash + Arrays.hashCode(this.reportedId);
+        hash = 61 * hash + this.duration;
+        hash = 61 * hash + Objects.hashCode(this.startDate);
+        return hash;
     }
 
     @Override

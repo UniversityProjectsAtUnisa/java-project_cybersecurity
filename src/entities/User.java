@@ -13,50 +13,45 @@ import java.util.Objects;
  */
 public class User implements Comparable<User> {
 
-    private final byte[] cf;
+    private final byte[] hashedCf;
     private final int id;
-    private byte[] password;
+    private byte[] hashedPassword;
     private byte[] userSalt;
     private Timestamp lastLoginDate;
     private Timestamp lastPositiveSwabDate;
     private Timestamp lastSwabCreationDate;
 
-    public User(int id, byte[] cf, byte[] password, byte[] userSalt) {
-        this.cf = cf;
-        this.id = id;
-        this.password = password;
-        this.userSalt = userSalt;
-        this.lastLoginDate = null;
-        this.lastSwabCreationDate = null;
-        this.lastPositiveSwabDate = null;
-    }
-
-    public User(int id, byte[] cf, byte[] password, byte[] userSalt,
+    
+    public User(int id, byte[] hashedCf, byte[] hashedPassword, byte[] userSalt,
             Timestamp lastLoginDate, Timestamp lastSwabCreationDate,
             Timestamp lastPositiveSwabDate) {
-        this.cf = cf;
         this.id = id;
-        this.password = password;
+        this.hashedCf = hashedCf;
+        this.hashedPassword = hashedPassword;
         this.userSalt = userSalt;
         this.lastLoginDate = lastLoginDate;
         this.lastSwabCreationDate = lastSwabCreationDate;
         this.lastPositiveSwabDate = lastPositiveSwabDate;
     }
+    
+    public User(int id, byte[] hashedCf, byte[] hashedPassword, byte[] userSalt) {
+        this(id, hashedCf, hashedPassword, userSalt, null, null, null);
+    }
 
-    public byte[] getCf() {
-        return cf;
+    public byte[] getHashedCf() {
+        return hashedCf;
     }
 
     public int getId() {
         return id;
     }
 
-    public byte[] getPassword() {
-        return password;
+    public byte[] getHashedPassword() {
+        return hashedPassword;
     }
 
-    public void setPassword(byte[] password) {
-        this.password = password;
+    public void setHashedPassword(byte[] hashedPassword) {
+        this.hashedPassword = hashedPassword;
     }
 
     public byte[] getUserSalt() {
@@ -101,6 +96,19 @@ public class User implements Comparable<User> {
         }
         User user = (User) o;
         return id == user.id;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        hash = 59 * hash + Arrays.hashCode(this.hashedCf);
+        hash = 59 * hash + this.id;
+        hash = 59 * hash + Arrays.hashCode(this.hashedPassword);
+        hash = 59 * hash + Arrays.hashCode(this.userSalt);
+        hash = 59 * hash + Objects.hashCode(this.lastLoginDate);
+        hash = 59 * hash + Objects.hashCode(this.lastPositiveSwabDate);
+        hash = 59 * hash + Objects.hashCode(this.lastSwabCreationDate);
+        return hash;
     }
 
     @Override
