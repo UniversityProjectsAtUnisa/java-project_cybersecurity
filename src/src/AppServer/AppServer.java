@@ -77,25 +77,25 @@ public class AppServer extends SSLServer {
                 loggedUser = this.database.findUser(token.getId());
             }
 
-            Serializable data = "Internal server error";
             Logger.getGlobal().info(endpointName);
-            switch (endpointName) {
+            Serializable data = switch (endpointName) {
                 case "login" -> {
                     Credentials loginData = (Credentials) req.getPayload();
-                    data = this.login(loginData.getCf(), loginData.getPassword());
+                    return this.login(loginData.getCf(), loginData.getPassword());
                 }
                 case "register" -> {
                     Credentials registerData = (Credentials) req.getPayload();
-                    data = this.register(registerData.getCf(), registerData.getPassword());
+                    return this.register(registerData.getCf(), registerData.getPassword());
                 }
                 case "createReport" -> {
                     ContactReportMessage createReportData = (ContactReportMessage) req.getPayload();
-                    data = this.createReport(createReportData.getIdUserToReport(), createReportData.getDuration(), createReportData.getStartDateTime(), loggedUser);
+                    return this.createReport(createReportData.getIdUserToReport(), createReportData.getDuration(), createReportData.getStartDateTime(), loggedUser);
                 }
-                case "getNotifications" -> data = this.getNotifications(loggedUser);
+                case "getNotifications" ->
+                    data = this.getNotifications(loggedUser);
                 case "getNotificationSuspensionDate" -> {
                     String code = (String) req.getPayload();
-                    data = this.getNotificationSuspensionDate(code, loggedUser);
+                    return this.getNotificationSuspensionDate(code, loggedUser);
                 }
 //                case "notifyPositiveUser":
 //                    response = this.notifyPositiveUser(payload.getCf());
@@ -103,7 +103,7 @@ public class AppServer extends SSLServer {
 //                case "useNotification":
 //                    response = this.useNotification(payload.getCode());
 //                    break;
-            }
+            };
             return Response.make(data);
         } catch (AuthenticationException e) {
             return Response.error(e.getMessage());
@@ -225,8 +225,8 @@ public class AppServer extends SSLServer {
     }
 
     public Timestamp getNotificationSuspensionDate(String code, User loggedUser) throws AuthenticationException {
-        Notification notification =  this.database.searchNotification(code);
-        if(notification.getId() != loggedUser.getId()){
+        Notification notification = this.database.searchNotification(code);
+        if (notification.getId() != loggedUser.getId()) {
             throw new AuthenticationException("The logged user does not own the selected notificationToken");
         }
         return notification.getSuspensionDate();
