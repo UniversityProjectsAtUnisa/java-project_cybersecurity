@@ -131,8 +131,8 @@ public class AppServer extends SSLServer {
         byte[] passwordHashed = md.digest(passwordConcat);
         if (Arrays.equals(passwordHashed, user.getPassword())) {
             int id = user.getId();
-            this.database.updateUser(user.getCf(), ServerUtils.getNow(), null, null);
             AuthToken token = new AuthToken(id, this.getSalt2());
+            this.database.updateUser(user.getCf(), token.getCreatedAt(), null, null);
             return token;
         }
         return null;
