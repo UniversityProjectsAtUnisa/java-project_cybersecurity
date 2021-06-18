@@ -84,14 +84,12 @@ public abstract class Token implements Serializable {
         if (!Objects.equals(this.payload, other.payload)) {
             return false;
         }
-        if (!Objects.equals(this.sigma, other.sigma)) {
+        if (!ServerUtils.dumbStringCompare(this.sigma, other.sigma)) {
             return false;
         }
         return true;
     }
 
-    
-    
     protected boolean verifySigma(byte[] key) throws InvalidKeyException, NoSuchAlgorithmException {
         String calculatedSigma = this.calculateSigma(this.payload, key);
         return ServerUtils.dumbStringCompare(calculatedSigma, this.sigma);

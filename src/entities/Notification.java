@@ -9,40 +9,31 @@ import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import core.tokens.NotificationToken;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Objects;
 
 /**
  */
-public class Notification implements Comparable {
-    private final String code;
-    private Timestamp expireDate;
-    private Timestamp suspensionDate;
-    private final int id;
+public class Notification implements Comparable<Notification> {
 
-    public Notification(String code, int id) {
-        this.code = code;
-        this.expireDate = this.getExpireDateFromCode(code);
-        this.suspensionDate = null;
-        this.id = id;
+    private final NotificationToken token;
+    private Timestamp suspensionDate;
+
+    public Notification(String code) throws InvalidKeyException, NoSuchAlgorithmException {
+        this.token = new NotificationToken(code);
     }
 
-    private Timestamp getExpireDateFromCode(String code) {
-        try {
-            String data = code.substring(code.indexOf(",") + 1, code.indexOf("."));
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-            Date parsedDate = dateFormat.parse(data);
-            Timestamp timestamp = new java.sql.Timestamp(parsedDate.getTime());
-            return timestamp;
-        } catch (Exception e) {
-            return null;
-        }
+    public NotificationToken getToken() {
+        return token;
     }
 
     public String getCode() {
-        return code;
+        return token.getCode();
     }
 
     public Timestamp getExpireDate() {
-        return expireDate;
+        return token.getExpireDate();
     }
 
     public Timestamp getSuspensionDate() {
@@ -51,14 +42,26 @@ public class Notification implements Comparable {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         Notification that = (Notification) o;
-        return code.equals(that.code) && expireDate.equals(that.expireDate) && suspensionDate.equals(that.suspensionDate);
+        return suspensionDate.equals(that.suspensionDate) && token.equals(that.getToken());
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 7;
+        hash = 83 * hash + Objects.hashCode(this.token);
+        hash = 83 * hash + Objects.hashCode(this.suspensionDate);
+        return hash;
     }
 
     public int getId() {
-        return id;
+        return token.getId();
     }
 
     public void setSuspensionDate(Timestamp suspensionDate) {
@@ -66,14 +69,7 @@ public class Notification implements Comparable {
     }
 
     @Override
-    public int compareTo(Object o) {
-        Notification notification = (Notification) o;
-        if(this == notification){
-            return 0;
-        }else if(this.getId() > notification.getId()){
-            return 1;
-        }else{
-            return -1;
-        }
+    public int compareTo(Notification n) {
+        return this.getId() - n.getId();
     }
 }
