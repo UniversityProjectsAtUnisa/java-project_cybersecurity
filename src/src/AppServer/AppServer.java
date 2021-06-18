@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.logging.Logger;
 
+import apis.HAApiService;
 import core.Request;
 import core.Response;
 import core.SSLServer;
@@ -48,9 +49,11 @@ public class AppServer extends SSLServer {
     private String salt1 = "";
     private String salt2 = "";
     private final Database database;
+    private final HAApiService healthApiService;
 
-    public AppServer() throws IOException {
-        super(Config.SERVER_KEYSTORE, Config.SERVER_TRUSTSTORE, "changeit", Config.APP_SERVER_PORT);
+    public AppServer(String password) throws IOException {
+        super(Config.SERVER_KEYSTORE, Config.SERVER_TRUSTSTORE, password, Config.APP_SERVER_PORT);
+        healthApiService = new HAApiService(password);
         this.database = new Database();
         SecretKey key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "salt1");
         this.salt1 = ServerUtils.toString(key1.getEncoded());
@@ -142,9 +145,9 @@ public class AppServer extends SSLServer {
     }
 
     public boolean register(String cf, String password) throws NoSuchAlgorithmException {
-        /* if (!HealthApi.checkCf(cf)){
+        if (!healthApiService.checkCf(cf)){
             return false;
-        }*/
+        }
         byte[] passwordBytes = password.getBytes();
         byte[] userSalt = new byte[32];
         new SecureRandom().nextBytes(userSalt);

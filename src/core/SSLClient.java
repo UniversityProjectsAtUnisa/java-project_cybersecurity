@@ -22,8 +22,10 @@ public class SSLClient {
             System.setProperty("javax.net.ssl.keyStore", Config.KEYSTORES_BASE_PATH + keyStore);
             System.setProperty("javax.net.ssl.keyStorePassword", password);
         }
-        System.setProperty("javax.net.ssl.trustStore", Config.KEYSTORES_BASE_PATH + trustStore);
-        System.setProperty("javax.net.ssl.trustStorePassword", password);
+        if (trustStore != null) {
+            System.setProperty("javax.net.ssl.trustStore", Config.KEYSTORES_BASE_PATH + trustStore);
+            System.setProperty("javax.net.ssl.trustStorePassword", password);
+        }
 
         sslFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
         this.hostIp = hostIp;
