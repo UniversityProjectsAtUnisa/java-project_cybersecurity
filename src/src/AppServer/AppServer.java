@@ -167,24 +167,14 @@ public class AppServer extends SSLServer {
             return true;
         }
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd H:mm:ss");
         Timestamp cEndDateMax = new Timestamp(0);
 
-        LocalDateTime reportEndDate = date.toLocalDateTime().plusSeconds(duration);
-        String strReportEndDate = reportEndDate.format(formatter);
-        Timestamp timestampReportEndDate = Timestamp.valueOf(strReportEndDate);
+        Timestamp timestampReportEndDate = ServerUtils.addSeconds(date, duration);
+        Timestamp timestampAfterSubtraction = ServerUtils.minusSeconds(ServerUtils.getNow(), 15*60);
         //algorithm
         for (ContactReport c : reports) {
-            LocalDateTime datetime = c.getStartContactDate().toLocalDateTime();
 
-            datetime = datetime.minusMinutes(15);
-            String afterSubtraction = datetime.format(formatter);
-            Timestamp timestampAfterSubtraction = Timestamp.valueOf(afterSubtraction);
-
-            LocalDateTime cEndDate = c.getStartContactDate().toLocalDateTime().plusSeconds(c.getDuration());
-            String strCEndDate = cEndDate.format(formatter);
-            Timestamp timestampCEndDate = Timestamp.valueOf(strCEndDate);
-
+            Timestamp timestampCEndDate = ServerUtils.addSeconds(c.getStartContactDate(), c.getDuration());
             cEndDateMax = ServerUtils.maxTimestamp(cEndDateMax, timestampCEndDate);
 
             if ((!c.getStartContactDate().after(date) && !date.after(timestampCEndDate)
@@ -192,7 +182,7 @@ public class AppServer extends SSLServer {
                     && !c.getStartContactDate().before(timestampAfterSubtraction)) {
 
                 if (timestampReportEndDate.after(timestampCEndDate)) {
-                    this.database.removeContactReport(cfReported, cfReporter, c.getStartContactDate());
+                    this.database.removeContactReport(c.getReporterId(), c.getReportedId(), c.getStartContactDate());
                 }
 
                 Timestamp maxInit = ServerUtils.maxTimestamp(date, c.getStartContactDate());

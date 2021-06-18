@@ -13,9 +13,13 @@ import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 
 public class ServerUtils {
+
+    static DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd H:mm:ss");
 
     public static String toHex(byte[] data, int length) {
         return toHex(data, data.length);
@@ -148,6 +152,18 @@ public class ServerUtils {
         long timeT2 = t2.getTime();
         long diff = Math.round(Math.abs(timeT1 - timeT2)/1000);
         return (int) diff;
+    }
+
+    public static Timestamp addSeconds(Timestamp startDate, int seconds){
+        LocalDateTime cEndDate = startDate.toLocalDateTime().plusSeconds(seconds);
+        String strCEndDate = cEndDate.format(formatter);
+        return Timestamp.valueOf(strCEndDate);
+    }
+
+    public static Timestamp minusSeconds(Timestamp startDate, int seconds){
+        LocalDateTime cEndDate = startDate.toLocalDateTime().minusSeconds(seconds);
+        String strCEndDate = cEndDate.format(formatter);
+        return Timestamp.valueOf(strCEndDate);
     }
 
     public static boolean dumbStringCompare(String str1, String str2) {
