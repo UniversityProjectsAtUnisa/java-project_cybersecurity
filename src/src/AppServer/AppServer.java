@@ -78,25 +78,29 @@ public class AppServer extends SSLServer {
             }
 
             Logger.getGlobal().info(endpointName);
-            Serializable data = switch (endpointName) {
-                case "login" -> {
+            Serializable data = "Internal server error";
+            
+            switch (endpointName) {
+                case "login":
                     Credentials loginData = (Credentials) req.getPayload();
-                    return this.login(loginData.getCf(), loginData.getPassword());
-                }
-                case "register" -> {
+                    data = this.login(loginData.getCf(), loginData.getPassword());
+                    break;
+                case "register":
                     Credentials registerData = (Credentials) req.getPayload();
-                    return this.register(registerData.getCf(), registerData.getPassword());
-                }
-                case "createReport" -> {
+                    data = this.register(registerData.getCf(), registerData.getPassword());
+                    break;
+                case "createReport":
                     ContactReportMessage createReportData = (ContactReportMessage) req.getPayload();
-                    return this.createReport(createReportData.getIdUserToReport(), createReportData.getDuration(), createReportData.getStartDateTime(), loggedUser);
-                }
-                case "getNotifications" ->
+                    data = this.createReport(createReportData.getIdUserToReport(), createReportData.getDuration(), createReportData.getStartDateTime(), loggedUser);
+                    break;
+                case "getNotifications":
                     data = this.getNotifications(loggedUser);
-                case "getNotificationSuspensionDate" -> {
+                    break;
+                case "getNotificationSuspensionDate":
                     String code = (String) req.getPayload();
-                    return this.getNotificationSuspensionDate(code, loggedUser);
-                }
+                    data = this.getNotificationSuspensionDate(code, loggedUser);
+                    break;
+
 //                case "notifyPositiveUser":
 //                    response = this.notifyPositiveUser(payload.getCf());
 //                    break;
@@ -119,11 +123,8 @@ public class AppServer extends SSLServer {
         }
         byte[] userSalt = user.getUserSalt();
         byte[] passwordBytes = password.getBytes();
-
-        byte[] passwordConcat = ServerUtils.concatByteArray(passwordBytes, userSalt);
-
-        MessageDigest md = MessageDigest.getInstance("SHA-256");
-        byte[] passwordHashed = md.digest(passwordConcat);
+        byte[] passwordHashed = ServerUtils.encryptWithSalt(passwordBytes, userSalt);
+        
         if (Arrays.equals(passwordHashed, user.getPassword())) {
             int id = user.getId();
             this.database.updateUser(user.getCf(), ServerUtils.getNow(), null, null);

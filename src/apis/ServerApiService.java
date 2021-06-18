@@ -14,6 +14,7 @@ import java.sql.Timestamp;
 import java.util.List;
 
 public class ServerApiService {
+
     private static final String PASSWORD = "changeit";
     private final SSLClient client;
 
@@ -23,7 +24,9 @@ public class ServerApiService {
 
     private Response sendRequest(String endpoint, Serializable data, AuthToken token, String errMsg) {
         Response res = client.sendRequest(endpoint, data, token);
-        if (!res.isSuccess()) throw new RequestFailedException("REQUEST FAILED: " + errMsg);
+        if (!res.isSuccess()) {
+            throw new RequestFailedException("REQUEST FAILED: " + errMsg);
+        }
         return res;
     }
 
