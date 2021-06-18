@@ -79,7 +79,7 @@ public class AppServer extends SSLServer {
 
             Logger.getGlobal().info(endpointName);
             Serializable data = "Internal server error";
-            
+
             switch (endpointName) {
                 case "login":
                     Credentials loginData = (Credentials) req.getPayload();
@@ -110,8 +110,10 @@ public class AppServer extends SSLServer {
             };
             return Response.make(data);
         } catch (AuthenticationException e) {
+            Logger.getGlobal().warning(e.getMessage());
             return Response.error(e.getMessage());
         } catch (Exception e) {
+            Logger.getGlobal().warning(e.getMessage());
             return Response.error("Internal server error");
         }
     }
@@ -123,8 +125,11 @@ public class AppServer extends SSLServer {
         }
         byte[] userSalt = user.getUserSalt();
         byte[] passwordBytes = password.getBytes();
-        byte[] passwordHashed = ServerUtils.encryptWithSalt(passwordBytes, userSalt);
-        
+        byte[] passwordConcat = ServerUtils.concatByteArray(passwordBytes, userSalt);
+
+        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        byte[] passwordHashed = md.digest(passwordConcat);
+
         if (Arrays.equals(passwordHashed, user.getPassword())) {
             int id = user.getId();
             this.database.updateUser(user.getCf(), ServerUtils.getNow(), null, null);

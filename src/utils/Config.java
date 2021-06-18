@@ -5,7 +5,7 @@ public class Config {
     public static final int EXPIRE_DAYS = 5;
     public static final int RISK_MINUTES = 5;
 
-    public static final int TC = 5000;
+    public static final int TC = 3000;
     public static final int N_CUM = 30;
 
     public static final String APP_SERVER_IP = "localhost";
