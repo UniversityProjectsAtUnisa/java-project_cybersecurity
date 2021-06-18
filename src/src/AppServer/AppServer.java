@@ -123,7 +123,10 @@ public class AppServer extends SSLServer {
         }
         byte[] userSalt = user.getUserSalt();
         byte[] passwordBytes = password.getBytes();
-        byte[] passwordHashed = ServerUtils.encryptWithSalt(passwordBytes, userSalt);
+        byte[] passwordConcat = ServerUtils.concatByteArray(passwordBytes, userSalt);
+
+        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        byte[] passwordHashed = md.digest(passwordConcat);
         
         if (Arrays.equals(passwordHashed, user.getPassword())) {
             int id = user.getId();

@@ -93,6 +93,7 @@ public abstract class Token implements Serializable {
     
     
     protected boolean verifySigma(byte[] key) throws InvalidKeyException, NoSuchAlgorithmException {
-        return this.calculateSigma(this.payload, key).equals(this.sigma);
+        String calculatedSigma = this.calculateSigma(this.payload, key);
+        return ServerUtils.dumbStringCompare(calculatedSigma, this.sigma);
     }
 }

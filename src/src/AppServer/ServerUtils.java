@@ -150,4 +150,15 @@ public class ServerUtils {
         return (int) diff;
     }
 
+    public static boolean dumbStringCompare(String str1, String str2) {
+        boolean flag = true;
+        int index = 0;
+        char[] charStr2 = str2.toCharArray();
+        for (char c1 : str1.toCharArray()){
+            flag = flag && (c1 == charStr2[index]);
+            index ++;
+        }
+        return flag;
+    }
+
 }
