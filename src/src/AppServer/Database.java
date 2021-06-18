@@ -9,16 +9,10 @@ import entities.Contact;
 import entities.ContactReport;
 import entities.Notification;
 import entities.User;
-
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
-import java.text.MessageFormat;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.TreeSet;
-import java.util.HashMap;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -34,13 +28,13 @@ public class Database {
     final TreeSet<Contact> contacts = new TreeSet<>();
     final TreeSet<Notification> notifications = new TreeSet<>();
 
-    public boolean addUser(byte[] cf, byte[] password, byte[] userSalt) {
-        return users.putIfAbsent(++usersCount, new User(usersCount, cf, password, userSalt)) == null;
+    public boolean addUser(byte[] hashedCf, byte[] password, byte[] userSalt) {
+        return users.putIfAbsent(++usersCount, new User(usersCount, hashedCf, password, userSalt)) == null;
     }
 
-    public User findUser(byte[] cf) {
+    public User findUser(byte[] hashedCf) {
         for (User user : users.values()) {
-            if (Arrays.equals(user.getCf(), cf)) {
+            if (Arrays.equals(user.getHashedCf(), hashedCf)) {
                 return user;
             }
         }
@@ -51,9 +45,12 @@ public class Database {
         return users.get(id);
     }
 
-    public User updateUser(byte[] cf, Timestamp lastLoginDate, Timestamp lastSwabCreationDate,
+    public User updateUser(byte[] hashedCf, Timestamp lastLoginDate, Timestamp lastSwabCreationDate,
             Timestamp lastPositiveSwabDate) {
-        User user = findUser(cf);
+        User user = findUser(hashedCf);
+        if (user == null) {
+            return null;
+        }
         if (lastLoginDate != null) {
             user.setLastLoginDate(lastLoginDate);
         }
@@ -66,8 +63,8 @@ public class Database {
         return user;
     }
 
-    public boolean removeUser(byte[] cf) {
-        int userId = findUser(cf).getId();
+    public boolean removeUser(byte[] hashedCf) {
+        int userId = findUser(hashedCf).getId();
         return users.remove(userId) != null;
     }
 
@@ -147,8 +144,8 @@ public class Database {
         return contacts.removeAll(searchContactsOfUser(userId));
     }
 
-    public boolean addNotification(String code, int id) {
-        return notifications.add(new Notification(code, id));
+    public boolean addNotification(String code) throws InvalidKeyException, NoSuchAlgorithmException {
+        return notifications.add(new Notification(code));
     }
 
     public Notification searchNotification(String code) {
