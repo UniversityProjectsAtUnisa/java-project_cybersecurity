@@ -16,17 +16,14 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
+import utils.Config;
 
 public class ServerUtils {
 
     static DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd H:mm:ss");
-
-    public static String toHex(byte[] data, int length) {
-        return toHex(data, data.length);
-    }
-
-    public static String toHex(byte[] data) {
-        return toHex(data, data.length);
+    
+    public static Timestamp getLastValidDateForContact() {
+        return Timestamp.valueOf(LocalDateTime.now().minusDays(Config.CONTACT_DURATION_DAYS));
     }
 
     public static String toString(
@@ -74,7 +71,7 @@ public class ServerUtils {
     }
     
     public static byte[] encryptWithSalt(byte[] data, byte[] salt) throws NoSuchAlgorithmException{
-        byte[] concatenation = concatByteArray(salt, data);
+        byte[] concatenation = concatByteArray(data, salt);
         return MessageDigest.getInstance("SHA-256").digest(concatenation);
     }
 
