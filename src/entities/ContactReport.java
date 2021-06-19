@@ -56,7 +56,7 @@ public class ContactReport implements Comparable<ContactReport> {
 
     public ContactReport findOverlapWith(ContactReport other) {
         // Se non sono sovrapposti ritorna null
-        if (this.getEndDate().before(other.getStartDate()) || this.getStartDate().before(other.getEndDate())) {
+        if (!this.getEndDate().after(other.getStartDate()) || !this.getStartDate().after(other.getEndDate())) {
             return null;
         }
 

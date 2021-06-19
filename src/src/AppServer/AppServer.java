@@ -228,7 +228,7 @@ public class AppServer {
         //        
         // FASE 1
         // Se il reporter sono io e il reported è la persona che ho appena visto
-        // Certo tutti i report in cui il reported ha visto il reporter
+        // Cerco tutti i report in cui il reported ha visto il reporter
         // Ovvero tutti i report in cui la persona che ho appena visto ha visto me
         List<ContactReport> reports = this.database.searchContactReportsOfUsers(cfReported, cfReporter);
 
@@ -258,7 +258,7 @@ public class AppServer {
             }
         }
 
-        boolean anyReportIsMoreRecent = mostRecentReport.getEndDate().after(newReport.getEndDate());
+        boolean anyReportIsMoreRecent = !mostRecentReport.getEndDate().before(newReport.getEndDate());
         if (!anyReportIsMoreRecent) {
             if (!this.database.addContactReport(newReport)) {
                 throw new InsertFailedException("Contact report creation failed");
