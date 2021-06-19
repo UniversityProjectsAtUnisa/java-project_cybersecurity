@@ -17,8 +17,12 @@ public abstract class BaseApiService {
     protected Response sendRequest(String endpoint, Serializable data, AuthToken token, String errMsg) {
         Response res = client.sendRequest(endpoint, data, token);
         if (!res.isSuccess()) {
-            throw new RequestFailedException("REQUEST FAILED: " + errMsg);
+            throw new RequestFailedException("REQUEST FAILED " + errMsg + ": " + res.getPayload());
         }
         return res;
+    }
+
+    protected Response sendRequest(String endpoint, Serializable data, String errMsg) {
+        return sendRequest(endpoint, data, null, errMsg);
     }
 }

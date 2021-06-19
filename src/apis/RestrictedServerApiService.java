@@ -2,6 +2,9 @@ package apis;
 
 import core.Response;
 import utils.Config;
+import utils.UseNotificationMessage;
+
+import java.io.Serializable;
 
 public class RestrictedServerApiService extends BaseApiService {
 
@@ -10,7 +13,13 @@ public class RestrictedServerApiService extends BaseApiService {
     }
 
     public boolean notifyPositiveUser(String cf) {
-        Response res = sendRequest("NOTIFY_POSITIVE_USER", cf, null, "notifyPositiveUser");
+        Response res = sendRequest("NOTIFY_POSITIVE_USER", cf, "notifyPositiveUser");
+        return (boolean) res.getPayload();
+    }
+
+    public boolean useNotification(String tamponCode, String cf) {
+        Serializable payload = new UseNotificationMessage(tamponCode, cf);
+        Response res = sendRequest("USE_NOTIFICATION", payload, "useNotification");
         return (boolean) res.getPayload();
     }
 }

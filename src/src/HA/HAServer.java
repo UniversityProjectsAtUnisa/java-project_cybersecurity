@@ -37,21 +37,33 @@ public class HAServer extends SSLServer {
 
     @Override
     public void start() {
-        TimerTask task = new TimerTask() {
+        TimerTask task1 = new TimerTask() {
             public void run() {
                 notifyPositiveUser();
             }
         };
-        Timer tm = new Timer();
-        tm.schedule(task, 1000, 1000);
+        Timer tm1 = new Timer();
+        // tm1.schedule(task, 1000, 1000);
+
+        TimerTask task2 = new TimerTask() {
+            public void run() {
+                useNotification();
+            }
+        };
+        Timer tm2 = new Timer();
+        // tm2.schedule(task, 1000, 1000);
+
         super.start();
     }
 
     public void notifyPositiveUser() {
-        String cf = SimulationData.VALID_CF_LIST.get(0);
-        Logger.getGlobal().info("Sending POSITIVE NOTIFY to: " + cf);
-        boolean success = restrictedServerApiService.notifyPositiveUser(cf);
-        Logger.getGlobal().info("POSITIVE RESULT: " + success);
+        String cf = SimulationData.VALID_CF_LIST.get(0);  // TODO: add logic (random)
+        restrictedServerApiService.notifyPositiveUser(cf);
+    }
+
+    public void useNotification() {
+        String cf = SimulationData.VALID_CF_LIST.get(0);  // TODO: add logic
+        restrictedServerApiService.useNotification("123456789", cf);
     }
 
     public boolean isCfValid(String cf) {
