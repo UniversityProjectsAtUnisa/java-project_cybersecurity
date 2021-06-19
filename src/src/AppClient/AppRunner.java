@@ -8,6 +8,7 @@ import java.util.logging.Logger;
 
 public class AppRunner {
     public static void main(String[] args) {
+        System.setProperty("java.util.logging.SimpleFormatter.format", Config.LOGGER_FMT);
         AppTimer globalAppTimer = AppTimer.getInstance();
         AppClient[] clients = new AppClient[Config.CLIENT_COUNT];
 

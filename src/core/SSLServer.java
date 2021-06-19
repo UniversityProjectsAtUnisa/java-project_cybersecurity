@@ -36,11 +36,8 @@ public abstract class SSLServer {
         Logger.getGlobal().info("SERVER STARTED");
         while (true) {
             try (SSLSocket acceptedSocket = (SSLSocket) serverSocket.accept()) {
-                Logger.getGlobal().info("ACCEPTED INCOMING CONNECTION");
-
                 try (ObjectInputStream in = new ObjectInputStream(acceptedSocket.getInputStream())) {
                     Request req = (Request) in.readObject();
-                    Logger.getGlobal().info(req.toString());
 
                     Response res = handleRequest(req);
                     try (ObjectOutputStream out = new ObjectOutputStream(acceptedSocket.getOutputStream())) {

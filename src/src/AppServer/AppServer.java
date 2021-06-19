@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.security.MessageDigest;
 import java.util.*;
 import java.sql.Timestamp;
 
@@ -26,15 +25,12 @@ import exceptions.InsertFailedException;
 import exceptions.NotFoundException;
 import exceptions.UpdateException;
 import java.io.Serializable;
-import java.util.logging.Level;
 import utils.Config;
 
 import javax.crypto.SecretKey;
 import javax.naming.AuthenticationException;
-import javax.xml.crypto.Data;
 import utils.ContactReportMessage;
 import utils.Credentials;
-import java.text.MessageFormat;
 import java.util.stream.Collectors;
 
 /**
@@ -121,7 +117,6 @@ public class AppServer {
 
             Logger.getGlobal().info(endpointName);
             Serializable data = "Internal server error";
-
             switch (endpointName) {
                 case "login":
                     Credentials loginData = (Credentials) req.getPayload();
@@ -152,10 +147,10 @@ public class AppServer {
             }
             return Response.make(data);
         } catch (AuthenticationException e) {
-            Logger.getGlobal().warning(e.getMessage());
+            Logger.getGlobal().warning(endpointName + ' ' + e.getMessage());
             return Response.error(e.getMessage());
         } catch (Exception e) {
-            Logger.getGlobal().warning(e.getMessage());
+            Logger.getGlobal().warning(endpointName + ' ' + e.getMessage());
             return Response.error("Internal server error");
         }
     }
