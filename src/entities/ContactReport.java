@@ -8,16 +8,17 @@ package entities;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.Collections;
+
 import src.AppServer.ServerUtils;
 import exceptions.InvalidContactException;
+
 import java.text.MessageFormat;
 import java.util.Objects;
 
 /**
- *
  * @author marco
  */
-public class ContactReport implements Comparable<ContactReport> {
+public class ContactReport {
 
     private final byte[] reporterHashedCf;
     private final byte[] reportedHashedCf;
@@ -63,34 +64,51 @@ public class ContactReport implements Comparable<ContactReport> {
         // Sono sicuramente sovrapposti quindi creo un nuovo contactReport che è il risultato della sovrapposizione
         Timestamp startDate = Collections.max(Arrays.asList(this.getStartDate(), other.getStartDate()));
         Timestamp endDate = Collections.min(Arrays.asList(this.getEndDate(), other.getEndDate()));
-        
-        System.out.println("startDate: "+startDate+" endDate: "+endDate + " duration: "+ ServerUtils.diffTimestampMillis(endDate, startDate));
+
+        System.out.println("startDate: " + startDate + " endDate: " + endDate + " duration: " + ServerUtils.diffTimestampMillis(endDate, startDate));
 
         return new ContactReport(this.getReporterHashedCf(), this.getReportedHashedCf(), ServerUtils.diffTimestampMillis(endDate, startDate), startDate);
     }
 
     @Override
     public boolean equals(Object o) {
-        System.out.println("Primo confronto");
         if (this == o) {
-            System.out.println("Questo oggetto e l'altro hanno lo stesso riferimento");
             return true;
         }
-        System.out.println("Secondo confronto");
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        System.out.println("Ultimo confronto");
         ContactReport that = (ContactReport) o;
-        if(duration == that.duration && Arrays.equals(reporterHashedCf, that.reporterHashedCf) && Arrays.equals(reportedHashedCf, that.reportedHashedCf) && startDate.equals(that.startDate)){
+        if (duration == that.duration &&
+                Arrays.equals(reporterHashedCf, that.reporterHashedCf) &&
+                Arrays.equals(reportedHashedCf, that.reportedHashedCf) &&
+                startDate.equals(that.startDate)) {
             return true;
         }
         return false;
     }
 
+
+//    @Override
+//    public int compareTo(ContactReport that) {
+//        int c = 0;
+//        if (this == that ||
+//                (duration == that.duration &&
+//                        Arrays.equals(reporterHashedCf, that.reporterHashedCf) &&
+//                        Arrays.equals(reportedHashedCf, that.reportedHashedCf) &&
+//                        startDate.equals(that.startDate))) {
+//            return 0;
+//        } else {
+//            c = this.getStartDate().compareTo(that.startDate);
+//            if (c==0){
+//
+//            }
+//            return c;
+//        }
+//    }
+
     @Override
     public int hashCode() {
-        System.out.println("Chiamato hashcode");
         int hash = 7;
         hash = 61 * hash + Arrays.hashCode(this.reporterHashedCf);
         hash = 61 * hash + Arrays.hashCode(this.reportedHashedCf);
@@ -99,15 +117,6 @@ public class ContactReport implements Comparable<ContactReport> {
         return hash;
     }
 
-    @Override
-    public int compareTo(ContactReport c) {
-        System.out.println("Chiamata compareTo");
-        if (this == c) {
-            return 0;
-        } else {
-            return this.getStartDate().compareTo(c.startDate);
-        }
-    }
 
     @Override
     public String toString() {
