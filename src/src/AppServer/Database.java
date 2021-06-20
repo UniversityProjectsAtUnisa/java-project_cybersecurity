@@ -5,6 +5,7 @@
  */
 package src.AppServer;
 
+import core.tokens.NotificationToken;
 import entities.Contact;
 import entities.ContactReport;
 import entities.Notification;
@@ -82,7 +83,7 @@ public class Database {
 
     public ContactReport searchContactReport(byte[] reporterId, byte[] reportedId, Timestamp startContactDate) {
         for (ContactReport contactReport : contactReports) {
-            if (Arrays.equals(contactReport.getReporterId(), reporterId) && Arrays.equals(contactReport.getReportedId(), reportedId) && contactReport.getStartDate().equals(startContactDate)) {
+            if (Arrays.equals(contactReport.getReporterHashedCf(), reporterId) && Arrays.equals(contactReport.getReportedHashedCf(), reportedId) && contactReport.getStartDate().equals(startContactDate)) {
                 return contactReport;
             }
         }
@@ -92,13 +93,13 @@ public class Database {
     public List<ContactReport> searchContactReportsOfUsers(byte[] reporterId, byte[] reportedId) {
         return contactReports
                 .stream()
-                .filter(report -> Arrays.equals(report.getReporterId(), reporterId)
-                && Arrays.equals(report.getReportedId(), reportedId))
+                .filter(report -> Arrays.equals(report.getReporterHashedCf(), reporterId)
+                && Arrays.equals(report.getReportedHashedCf(), reportedId))
                 .toList();
     }
 
     public List<ContactReport> searchContactReportOfReported(byte[] reportedId) {
-        return contactReports.stream().filter(report -> Arrays.equals(report.getReportedId(), reportedId)).toList();
+        return contactReports.stream().filter(report -> Arrays.equals(report.getReportedHashedCf(), reportedId)).toList();
     }
 
     public boolean removeContactReport(byte[] reporterId, byte[] reportedId, Timestamp startContactDate) {
@@ -120,8 +121,8 @@ public class Database {
             // La data di inizio è uguale
             if (contact.getStartDate().equals(startDate)
                     // Il contatto è bidirezionale
-                    && (Arrays.equals(contact.getReporterId(), reporterId) && Arrays.equals(contact.getReportedId(), reportedId)
-                    || (Arrays.equals(contact.getReporterId(), reportedId) && Arrays.equals(contact.getReportedId(), reporterId)))) {
+                    && (Arrays.equals(contact.getReporterHashedCf(), reporterId) && Arrays.equals(contact.getReportedHashedCf(), reportedId)
+                    || (Arrays.equals(contact.getReporterHashedCf(), reportedId) && Arrays.equals(contact.getReportedHashedCf(), reporterId)))) {
                 return contact;
             }
         }
@@ -132,7 +133,7 @@ public class Database {
 
         return contacts
                 .stream()
-                .filter(contact -> Arrays.equals(contact.getReporterId(), userId) || Arrays.equals(contact.getReportedId(), userId))
+                .filter(contact -> Arrays.equals(contact.getReporterHashedCf(), userId) || Arrays.equals(contact.getReportedHashedCf(), userId))
                 .toList();
     }
 
@@ -147,6 +148,16 @@ public class Database {
     public boolean addNotification(String code) throws InvalidKeyException, NoSuchAlgorithmException {
         return notifications.add(new Notification(code));
     }
+    
+    public boolean addNotification(NotificationToken token) throws InvalidKeyException, NoSuchAlgorithmException {
+        return notifications.add(new Notification(token));
+    }
+    
+    public boolean addNotification(Notification n) throws InvalidKeyException, NoSuchAlgorithmException {
+        return notifications.add(n);
+    }
+    
+    
 
     public Notification searchNotification(String code) {
         for (Notification notification : notifications) {

@@ -39,8 +39,12 @@ public final class NotificationToken extends Token {
         return Timestamp.valueOf(parts[1]);
     }
 
-    public NotificationToken(int id, Timestamp expireData, String cf, String salt1, String salt2) throws NoSuchAlgorithmException, InvalidKeyException {
-        super(id + "," + expireData.toString(), getNotificationTokenKey(cf, salt1, salt2));
+    public NotificationToken(int id, Timestamp expireDate, String cf, String salt1, String salt2) throws NoSuchAlgorithmException, InvalidKeyException {
+        super(id + "," + expireDate.toString(), getNotificationTokenKey(cf, salt1, salt2));
+    }
+    
+    public NotificationToken(int id, Timestamp expireDate, byte[] hashedCf, String salt2) throws NoSuchAlgorithmException, InvalidKeyException {
+        super(id + "," + expireDate.toString(), getNotificationTokenKey(hashedCf, salt2));
     }
 
     public NotificationToken(String raw) throws NoSuchAlgorithmException, InvalidKeyException {
@@ -58,6 +62,11 @@ public final class NotificationToken extends Token {
         byte[] salt1Bytes = ServerUtils.toByteArray(salt1);
         byte[] salt2Bytes = ServerUtils.toByteArray(salt2);
         byte[] hashedCf = ServerUtils.encryptWithSalt(cfBytes, salt1Bytes);
+        return ServerUtils.encryptWithSalt(hashedCf, salt2Bytes);
+    }
+    
+    private static byte[] getNotificationTokenKey(byte[] hashedCf, String salt2) throws NoSuchAlgorithmException {
+        byte[] salt2Bytes = ServerUtils.toByteArray(salt2);
         return ServerUtils.encryptWithSalt(hashedCf, salt2Bytes);
     }
 

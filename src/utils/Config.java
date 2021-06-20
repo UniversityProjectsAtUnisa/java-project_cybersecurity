@@ -2,7 +2,7 @@ package utils;
 
 public class Config {
     public static final int CLIENT_COUNT = 10;
-    public static final int EXPIRE_DAYS = 5;
+    public static final int NOTIFICATION_EXPIRE_DAYS = 5;
     public static final int RISK_MINUTES = 5;
 
     public static final int TC = 3000;

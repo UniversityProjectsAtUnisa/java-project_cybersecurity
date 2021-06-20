@@ -19,17 +19,17 @@ import java.util.Objects;
  */
 public class ContactReport implements Comparable<ContactReport> {
 
-    private final byte[] reporterId;
-    private final byte[] reportedId;
+    private final byte[] reporterHashedCf;
+    private final byte[] reportedHashedCf;
     private final int duration;
     private final Timestamp startDate;
 
-    public ContactReport(byte[] reporterId, byte[] reportedId, int duration, Timestamp startDate) {
-        if (Arrays.equals(reporterId, reportedId)) {
+    public ContactReport(byte[] reporterHashedCf, byte[] reportedHashedCf, int duration, Timestamp startDate) {
+        if (Arrays.equals(reporterHashedCf, reportedHashedCf)) {
             throw new InvalidContactException("Reporter and reported cannot be the same user");
         }
-        this.reporterId = reporterId;
-        this.reportedId = reportedId;
+        this.reporterHashedCf = reporterHashedCf;
+        this.reportedHashedCf = reportedHashedCf;
         this.duration = duration;
         this.startDate = startDate;
     }
@@ -46,12 +46,12 @@ public class ContactReport implements Comparable<ContactReport> {
         return duration;
     }
 
-    public byte[] getReportedId() {
-        return reportedId;
+    public byte[] getReportedHashedCf() {
+        return reportedHashedCf;
     }
 
-    public byte[] getReporterId() {
-        return reporterId;
+    public byte[] getReporterHashedCf() {
+        return reporterHashedCf;
     }
 
     public ContactReport findOverlapWith(ContactReport other) {
@@ -66,26 +66,34 @@ public class ContactReport implements Comparable<ContactReport> {
         
         System.out.println("startDate: "+startDate+" endDate: "+endDate + " duration: "+ ServerUtils.diffTimestampMillis(endDate, startDate));
 
-        return new ContactReport(this.getReporterId(), this.getReportedId(), ServerUtils.diffTimestampMillis(endDate, startDate), startDate);
+        return new ContactReport(this.getReporterHashedCf(), this.getReportedHashedCf(), ServerUtils.diffTimestampMillis(endDate, startDate), startDate);
     }
 
     @Override
     public boolean equals(Object o) {
+        System.out.println("Primo confronto");
         if (this == o) {
+            System.out.println("Questo oggetto e l'altro hanno lo stesso riferimento");
             return true;
         }
+        System.out.println("Secondo confronto");
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
+        System.out.println("Ultimo confronto");
         ContactReport that = (ContactReport) o;
-        return duration == that.duration && Arrays.equals(reporterId, that.reporterId) && Arrays.equals(reportedId, that.reportedId) && startDate.equals(that.startDate);
+        if(duration == that.duration && Arrays.equals(reporterHashedCf, that.reporterHashedCf) && Arrays.equals(reportedHashedCf, that.reportedHashedCf) && startDate.equals(that.startDate)){
+            return true;
+        }
+        return false;
     }
 
     @Override
     public int hashCode() {
+        System.out.println("Chiamato hashcode");
         int hash = 7;
-        hash = 61 * hash + Arrays.hashCode(this.reporterId);
-        hash = 61 * hash + Arrays.hashCode(this.reportedId);
+        hash = 61 * hash + Arrays.hashCode(this.reporterHashedCf);
+        hash = 61 * hash + Arrays.hashCode(this.reportedHashedCf);
         hash = 61 * hash + this.duration;
         hash = 61 * hash + Objects.hashCode(this.startDate);
         return hash;
@@ -93,6 +101,7 @@ public class ContactReport implements Comparable<ContactReport> {
 
     @Override
     public int compareTo(ContactReport c) {
+        System.out.println("Chiamata compareTo");
         if (this == c) {
             return 0;
         } else {
@@ -102,6 +111,6 @@ public class ContactReport implements Comparable<ContactReport> {
 
     @Override
     public String toString() {
-        return MessageFormat.format("reporterId={0}, reportedId={1}, duration={2}, startDate={3}", ServerUtils.toString(reporterId), ServerUtils.toString(reportedId), duration, startDate);
+        return MessageFormat.format("reporterHashedCf={0}, reportedHashedCf={1}, duration={2}, startDate={3}", ServerUtils.toString(reporterHashedCf), ServerUtils.toString(reportedHashedCf), duration, startDate);
     }
 }

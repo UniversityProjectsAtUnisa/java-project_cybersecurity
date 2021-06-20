@@ -23,6 +23,10 @@ public class Notification implements Comparable<Notification> {
     public Notification(String code) throws InvalidKeyException, NoSuchAlgorithmException {
         this.token = new NotificationToken(code);
     }
+    
+    public Notification(NotificationToken token) throws InvalidKeyException, NoSuchAlgorithmException {
+        this.token = token;
+    }
 
     public NotificationToken getToken() {
         return token;

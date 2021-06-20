@@ -25,6 +25,10 @@ public class ServerUtils {
     public static Timestamp getLastValidDateForContact() {
         return Timestamp.valueOf(LocalDateTime.now().minusDays(Config.CONTACT_DURATION_DAYS));
     }
+    
+    public static Timestamp getNotificationTokenExpireDays() {
+        return Timestamp.valueOf(LocalDateTime.now().plusDays(Config.NOTIFICATION_EXPIRE_DAYS));
+    }
 
     public static String toString(
             byte[] bytes,
@@ -149,6 +153,18 @@ public class ServerUtils {
         long timeT2 = t2.getTime();
         long diff = Math.round(Math.abs(timeT1 - timeT2));
         return (int) diff;
+    }
+    
+    public static Timestamp addDays(Timestamp startDate, int days){
+        LocalDateTime cEndDate = startDate.toLocalDateTime().plusDays(days);
+        String strCEndDate = cEndDate.format(formatter);
+        return Timestamp.valueOf(strCEndDate);
+    }
+
+    public static Timestamp minusDays(Timestamp startDate, int days){
+        LocalDateTime cEndDate = startDate.toLocalDateTime().minusDays(days);
+        String strCEndDate = cEndDate.format(formatter);
+        return Timestamp.valueOf(strCEndDate);
     }
 
     public static Timestamp addMillis(Timestamp startDate, int millis){
