@@ -26,18 +26,18 @@ public class Database {
     //    Comparator.comparing(Report::getReportKey)
 //            .thenComparing(Report::getStudentNumber)
 //            .thenComparing(Report::getSchool)
-
     private static int usersCount = 0;
     // TODO: Rimetti private
-    private Comparator<ContactReport> cmpContacts =  Comparator.comparing
-            (ContactReport::getStartDate)
+    private Comparator<ContactReport> cmpContacts = Comparator.comparing(ContactReport::getStartDate)
             .thenComparing(ContactReport::getDuration)
             .thenComparing((e1, e2) -> Arrays.compare(e1.getReporterHashedCf(), e2.getReporterHashedCf()))
             .thenComparing((e1, e2) -> Arrays.compare(e1.getReportedHashedCf(), e2.getReportedHashedCf()));
     final HashMap<Integer, User> users = new HashMap<>();
     final TreeSet<ContactReport> contactReports = new TreeSet<>(cmpContacts);
     final TreeSet<Contact> contacts = new TreeSet<>(cmpContacts);
-    final TreeSet<Notification> notifications = new TreeSet<>();
+    final TreeSet<Notification> notifications = new TreeSet<>(
+            Comparator.comparing(Notification::getToken)
+    );
 
     public boolean addUser(byte[] hashedCf, byte[] password, byte[] userSalt) {
         return users.putIfAbsent(++usersCount, new User(usersCount, hashedCf, password, userSalt)) == null;
@@ -57,7 +57,7 @@ public class Database {
     }
 
     public User updateUser(byte[] hashedCf, Timestamp lastLoginDate, Timestamp lastSwabCreationDate,
-                           Timestamp lastPositiveSwabDate) {
+            Timestamp lastPositiveSwabDate) {
         User user = findUser(hashedCf);
         if (user == null) {
             return null;
@@ -93,9 +93,9 @@ public class Database {
 
     public ContactReport searchContactReport(byte[] reporterId, byte[] reportedId, Timestamp startContactDate) {
         for (ContactReport contactReport : contactReports) {
-            if (Arrays.equals(contactReport.getReporterHashedCf(), reporterId) &&
-                    Arrays.equals(contactReport.getReportedHashedCf(), reportedId) &&
-                    contactReport.getStartDate().equals(startContactDate)) {
+            if (Arrays.equals(contactReport.getReporterHashedCf(), reporterId)
+                    && Arrays.equals(contactReport.getReportedHashedCf(), reportedId)
+                    && contactReport.getStartDate().equals(startContactDate)) {
                 return contactReport;
             }
         }
@@ -111,7 +111,7 @@ public class Database {
         return contactReports
                 .stream()
                 .filter(report -> Arrays.equals(report.getReporterHashedCf(), reporterId)
-                        && Arrays.equals(report.getReportedHashedCf(), reportedId))
+                && Arrays.equals(report.getReportedHashedCf(), reportedId))
                 .toList();
     }
 
@@ -173,7 +173,6 @@ public class Database {
     public boolean addNotification(Notification n) throws InvalidKeyException, NoSuchAlgorithmException {
         return notifications.add(n);
     }
-
 
     public Notification searchNotification(String code) {
         for (Notification notification : notifications) {

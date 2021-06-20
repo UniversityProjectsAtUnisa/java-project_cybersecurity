@@ -32,7 +32,7 @@ public class SSLClient {
         this.port = port;
     }
 
-    public Response sendRequest(String endpoint, Serializable data, AuthToken token) throws RequestFailedException {
+    public synchronized Response sendRequest(String endpoint, Serializable data, AuthToken token) throws RequestFailedException {
         try (SSLSocket socket = (SSLSocket) sslFactory.createSocket(hostIp, port)) {
             socket.startHandshake();
 

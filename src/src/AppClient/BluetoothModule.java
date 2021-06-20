@@ -4,6 +4,7 @@ import utils.Config;
 
 import java.util.HashSet;
 import java.util.Set;
+import utils.RandomUtils;
 
 public class BluetoothModule {
 
@@ -24,7 +25,7 @@ public class BluetoothModule {
      * Simulated blocking bluetooth broadcast
      */
     public BluetoothScan[] scan(int excludeId) {  // TODO: enhance logic
-        int amt = randomIntFromInterval(1, maxRandomUsers);
+        int amt = RandomUtils.randomIntFromInterval(1, maxRandomUsers);
         BluetoothScan[] res = new BluetoothScan[amt];
         Integer[] ids = getUniqueIds(amt, excludeId);
         for (int i = 0; i < amt; i++) {
@@ -34,14 +35,10 @@ public class BluetoothModule {
         return res;
     }
 
-    private int randomIntFromInterval(int min, int max) { // min and max included 
-        return (int) Math.floor(Math.random() * (max - min + 1) + min);
-    }
-
     private Integer[] getUniqueIds(int amount, int exclude) {
         Set<Integer> res = new HashSet<>();
         while (res.size() < amount) {
-            int newId = randomIntFromInterval(1, Config.CLIENT_COUNT);
+            int newId = RandomUtils.randomIntFromInterval(1, Config.CLIENT_COUNT);
             if (newId != exclude) {
                 res.add(newId);
             }

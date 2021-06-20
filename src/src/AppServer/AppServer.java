@@ -86,15 +86,17 @@ public class AppServer {
             switch (endpointName) {
                 case "USE_NOTIFICATION":
                     UseNotificationMessage notice = (UseNotificationMessage) req.getPayload();
-                    data = this.useNotification(notice.swabCode(), notice.getCf());
+                    data = this.useNotification(notice.getSwabCode(), notice.getCf());
                     break;
                 case "NOTIFY_POSITIVE_USER":
                     String cf = (String) req.getPayload();
                     data = this.notifyPositiveUser(cf);
+                    System.out.println("NOTIFY POSITIVE USER DATA: " + data);
                     break;
             }
             return Response.make(data);
         } catch (Exception e) {
+            e.printStackTrace();
             Logger.getGlobal().warning(endpointName + ' ' + e.getMessage());
             return Response.error("Internal server error");
 //        }
@@ -123,13 +125,13 @@ public class AppServer {
                 if (token == null) {
                     throw new AuthenticationException("The authentication token is not valid");
                 }
-                Timestamp lastLoginDate = this.database.findUser(token.getId()).getLastLoginDate();
-                if (!token.isValid(lastLoginDate, salt2)) {
-                    throw new AuthenticationException("The authentication token is not valid");
-                }
                 loggedUser = this.database.findUser(token.getId());
                 if (loggedUser == null) {
                     throw new AuthenticationException("User not found");
+                }
+                Timestamp lastLoginDate = loggedUser.getLastLoginDate();
+                if (!token.isValid(lastLoginDate, salt2)) {
+                    throw new AuthenticationException("The authentication token is not valid");
                 }
             }
 
@@ -161,6 +163,7 @@ public class AppServer {
             Logger.getGlobal().warning(endpointName + ' ' + e.getMessage());
             return Response.error(e.getMessage());
         } catch (Exception e) {
+            e.printStackTrace();
             Logger.getGlobal().warning(endpointName + ' ' + e.getMessage());
             return Response.error("Internal server error");
         }
@@ -217,7 +220,7 @@ public class AppServer {
     }
 
     public boolean createReport(int id, int duration, Timestamp date, User loggedUser) throws NoSuchAlgorithmException, InvalidKeyException, NotFoundException, InsertFailedException, DeletionFailedException {
-        Logger.getGlobal().info("CONTATTI NEL DB: " + this.database.contacts.size()+", REPORTS NEL DB:" + this.database.contactReports.size());
+        Logger.getGlobal().info("CONTATTI NEL DB: " + this.database.contacts.size() + ", REPORTS NEL DB:" + this.database.contactReports.size());
         byte[] cfReporter = loggedUser.getHashedCf();
         User reportedUser = this.database.findUser(id);
         if (reportedUser == null) {
@@ -246,11 +249,23 @@ public class AppServer {
         // FASE 2.1
         // Per ogni sovrapposizione così individuata creo un nuovo contatto e
         // lo inserisco nel database.
+        int flag = 0;
         for (ContactReport overlap : overlaps) {
             if (!this.database.addContact(overlap)) {
                 throw new InsertFailedException("Contact creation failed");
             } else {
+                flag++;
+
                 Logger.getGlobal().info("Contact created successfully");
+            }
+        }
+        if (flag > 0) {
+            List<User> usersAtRisk = findUsersAtRisk();
+            LinkedList<Integer> userIds = usersAtRisk.stream().map(u -> u.getId()).collect(Collectors.toCollection(LinkedList::new));
+            if (!userIds.isEmpty()) {
+                if (!healthApiService.sendUserIds(userIds)) {
+                    System.out.println("Failed to send testing data to the HAServer");
+                }
             }
         }
 
@@ -271,16 +286,15 @@ public class AppServer {
         }
 
 //        boolean newReportIsMostRecent = mostRecentReport.equals(newReport);
-
 //        Logger.getGlobal().info("Is new report the most recent ? "+ newReportIsMostRecent);
         Logger.getGlobal().info("is already present? " + this.database.isAlreadyPresentContactReport(newReport));
 
 //        if (newReportIsMostRecent) {
-            if (!this.database.addContactReport(newReport)) {
-                throw new InsertFailedException("Contact report creation failed");
-            } else {
-                Logger.getGlobal().info("Report created successfully");
-            }
+        if (!this.database.addContactReport(newReport)) {
+            throw new InsertFailedException("Contact report creation failed");
+        } else {
+            Logger.getGlobal().info("Report created successfully");
+        }
 //        }
 
         // FASE 4
@@ -292,7 +306,6 @@ public class AppServer {
 //                }
 //            }
 //        }
-
         return true;
     }
 
@@ -302,8 +315,10 @@ public class AppServer {
                 .stream()
                 .map(notification -> notification.getCode())
                 .collect(Collectors.toCollection(LinkedList::new));
-        if(!healthApiService.sendSwabCodes(notifications)){
-            System.out.println("Failed to send testing data to the HAServer");
+        if (notifications.size() != 0) {
+            if (!healthApiService.sendSwabCodes(notifications)) {
+                System.out.println("Failed to send testing data to the HAServer");
+            }
         }
         return notifications;
     }
@@ -339,7 +354,7 @@ public class AppServer {
         byte[] hashedCf = encryptCf(cfBytes);
         User user = this.database.findUser(hashedCf);
         if (user == null) {
-            return false;
+            return true;
         }
         Timestamp lastValidDateForContact = ServerUtils.getLastValidDateForContact();
         List<Contact> contacts = this.database
@@ -374,16 +389,16 @@ public class AppServer {
             }
         }
 
-        List<User> usersAtRisk = millisCounter.mostCommon(Config.RISK_MINUTES * 60 * 1000);
+        List<User> usersAtRisk = millisCounter.mostCommon(Config.RISK_SECONDS * 1000);
         NotificationToken token = null;
         for (User u : usersAtRisk) {
             try {
                 Timestamp expireDate = ServerUtils.getNotificationTokenExpireDays();
                 token = new NotificationToken(u.getId(), expireDate, u.getHashedCf(), salt2);
-                if(!this.database.addNotification(token)) {
+                if (!this.database.addNotification(token)) {
                     throw new InsertFailedException("Failed to add notification");
                 }
-                if(this.database.updateUser(u.getHashedCf(), null, ServerUtils.getNow(), null) == null) {
+                if (this.database.updateUser(u.getHashedCf(), null, ServerUtils.getNow(), null) == null) {
                     throw new UpdateException("Failed to update user");
                 }
             } catch (NoSuchAlgorithmException | InvalidKeyException e) {
@@ -429,9 +444,42 @@ public class AppServer {
 //                }
 //            }
 //        });
-
         return true;
 
+    }
+
+    private List<User> findUsersAtRisk() {
+        Timestamp lastValidDateForContact = ServerUtils.getLastValidDateForContact();
+        List<Contact> contacts = this.database.contacts
+                .stream()
+                .filter(contact -> contact.getEndDate().after(lastValidDateForContact))
+                .toList();
+
+        Counter<User> millisCounter = new Counter<>();
+        for (Contact c : contacts) {
+            User userI = this.database.findUser(c.getReporterHashedCf());
+            User userJ = this.database.findUser(c.getReportedHashedCf());
+            User[] twoUsers = {userI, userJ};
+
+            for (User user : twoUsers) {
+                Timestamp userSwabDate = user.getLastPositiveSwabDate();
+                if (userSwabDate == null) {
+                    userSwabDate = lastValidDateForContact;
+                }
+
+                Timestamp contactEndDate = c.getEndDate();
+                int contactDuration = c.getDuration();
+                if (contactEndDate.after(userSwabDate)) {
+                    millisCounter.add(user, contactDuration);
+                }
+            }
+        }
+        List<User> usersAtRisk = millisCounter.mostCommon(0);
+        if (!usersAtRisk.isEmpty()) {
+            System.out.println(millisCounter.count(usersAtRisk.get(0)));
+        }
+
+        return millisCounter.mostCommon(Config.RISK_SECONDS * 1000 * 20);
     }
 
     private String getSalt1() {

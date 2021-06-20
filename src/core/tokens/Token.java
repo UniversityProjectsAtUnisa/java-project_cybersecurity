@@ -23,7 +23,7 @@ import java.util.Objects;
  * sale_2) Notification: BASE64(id, data_scadenza).HMACSHA256(BASE64(id,
  * data_scadenza),SHA256(sale_2 || SHA256(sale_1 || codice_fiscale)))
  */
-public abstract class Token implements Serializable {
+public abstract class Token implements Serializable, Comparable<Token> {
 
     private String payload;
     private String sigma;
@@ -93,5 +93,14 @@ public abstract class Token implements Serializable {
     protected boolean verifySigma(byte[] key) throws InvalidKeyException, NoSuchAlgorithmException {
         String calculatedSigma = this.calculateSigma(this.payload, key);
         return ServerUtils.dumbStringCompare(calculatedSigma, this.sigma);
+    }
+
+    @Override
+    public int compareTo(Token o) {
+        int c = payload.compareTo(o.getPayload());
+        if (c == 0) {
+            c = sigma.compareTo(o.getSigma());
+        }
+        return c;
     }
 }
