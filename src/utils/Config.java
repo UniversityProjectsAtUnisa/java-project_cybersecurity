@@ -23,5 +23,5 @@ public class Config {
     public static final String SERVER_KEYSTORE = "server/serverKeystore.jks";
     public static final String SERVER_TRUSTSTORE = "server/serverTruststore.jks";
 
-    public static final String LOGGER_FMT = "[%1$tF %1$tT] [%4$s] %5$s %n";
+    public static final String LOGGER_FMT = "[%1$tT] [%4$s] %5$s %n";
 }

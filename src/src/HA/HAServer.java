@@ -29,6 +29,7 @@ public class HAServer extends SSLServer {
             boolean payload = isCfValid((String) req.getPayload());
             return Response.make(payload);
         } catch (Exception e) {
+            e.printStackTrace();
             String log = "Server Internal Error: " + e.getMessage();
             Logger.getGlobal().warning(log);
             return Response.error(log);
@@ -43,7 +44,7 @@ public class HAServer extends SSLServer {
             }
         };
         Timer tm1 = new Timer();
-        // tm1.schedule(task, 1000, 1000);
+        tm1.schedule(task1, 1000, 1000);
 
         TimerTask task2 = new TimerTask() {
             public void run() {
@@ -51,7 +52,7 @@ public class HAServer extends SSLServer {
             }
         };
         Timer tm2 = new Timer();
-        // tm2.schedule(task, 1000, 1000);
+        tm2.schedule(task2, 1000, 1000);
 
         super.start();
     }

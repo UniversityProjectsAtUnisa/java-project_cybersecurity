@@ -10,6 +10,7 @@ import entities.Contact;
 import entities.ContactReport;
 import entities.Notification;
 import entities.User;
+
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
@@ -22,11 +23,20 @@ import java.util.logging.Logger;
  */
 public class Database {
 
+    //    Comparator.comparing(Report::getReportKey)
+//            .thenComparing(Report::getStudentNumber)
+//            .thenComparing(Report::getSchool)
+
     private static int usersCount = 0;
     // TODO: Rimetti private
+    private Comparator<ContactReport> cmpContacts =  Comparator.comparing
+            (ContactReport::getStartDate)
+            .thenComparing(ContactReport::getDuration)
+            .thenComparing((e1, e2) -> Arrays.compare(e1.getReporterHashedCf(), e2.getReporterHashedCf()))
+            .thenComparing((e1, e2) -> Arrays.compare(e1.getReportedHashedCf(), e2.getReportedHashedCf()));
     final HashMap<Integer, User> users = new HashMap<>();
-    final TreeSet<ContactReport> contactReports = new TreeSet<>();
-    final TreeSet<Contact> contacts = new TreeSet<>();
+    final TreeSet<ContactReport> contactReports = new TreeSet<>(cmpContacts);
+    final TreeSet<Contact> contacts = new TreeSet<>(cmpContacts);
     final TreeSet<Notification> notifications = new TreeSet<>();
 
     public boolean addUser(byte[] hashedCf, byte[] password, byte[] userSalt) {
@@ -47,7 +57,7 @@ public class Database {
     }
 
     public User updateUser(byte[] hashedCf, Timestamp lastLoginDate, Timestamp lastSwabCreationDate,
-            Timestamp lastPositiveSwabDate) {
+                           Timestamp lastPositiveSwabDate) {
         User user = findUser(hashedCf);
         if (user == null) {
             return null;
@@ -83,18 +93,25 @@ public class Database {
 
     public ContactReport searchContactReport(byte[] reporterId, byte[] reportedId, Timestamp startContactDate) {
         for (ContactReport contactReport : contactReports) {
-            if (Arrays.equals(contactReport.getReporterHashedCf(), reporterId) && Arrays.equals(contactReport.getReportedHashedCf(), reportedId) && contactReport.getStartDate().equals(startContactDate)) {
+            if (Arrays.equals(contactReport.getReporterHashedCf(), reporterId) &&
+                    Arrays.equals(contactReport.getReportedHashedCf(), reportedId) &&
+                    contactReport.getStartDate().equals(startContactDate)) {
                 return contactReport;
             }
         }
         return null;
     }
 
+    //dev
+    public boolean isAlreadyPresentContactReport(ContactReport c) {
+        return this.contactReports.contains(c);
+    }
+
     public List<ContactReport> searchContactReportsOfUsers(byte[] reporterId, byte[] reportedId) {
         return contactReports
                 .stream()
                 .filter(report -> Arrays.equals(report.getReporterHashedCf(), reporterId)
-                && Arrays.equals(report.getReportedHashedCf(), reportedId))
+                        && Arrays.equals(report.getReportedHashedCf(), reportedId))
                 .toList();
     }
 
@@ -148,16 +165,15 @@ public class Database {
     public boolean addNotification(String code) throws InvalidKeyException, NoSuchAlgorithmException {
         return notifications.add(new Notification(code));
     }
-    
+
     public boolean addNotification(NotificationToken token) throws InvalidKeyException, NoSuchAlgorithmException {
         return notifications.add(new Notification(token));
     }
-    
+
     public boolean addNotification(Notification n) throws InvalidKeyException, NoSuchAlgorithmException {
         return notifications.add(n);
     }
-    
-    
+
 
     public Notification searchNotification(String code) {
         for (Notification notification : notifications) {

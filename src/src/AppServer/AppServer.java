@@ -26,14 +26,12 @@ import exceptions.NotFoundException;
 import exceptions.ServerException;
 import exceptions.UpdateException;
 import java.io.Serializable;
-import utils.Config;
+
+import utils.*;
 
 import javax.crypto.SecretKey;
 import javax.naming.AuthenticationException;
-import utils.ContactReportMessage;
-import utils.Credentials;
 import java.util.stream.Collectors;
-import utils.Counter;
 
 /**
  *
@@ -82,13 +80,31 @@ public class AppServer {
     }
 
     public synchronized Response restrictedHandleRequest(Request req) {
+        String endpointName = req.getEndpointName();
+        Serializable data = "Internal server error";
         try {
-            String cf = (String) req.getPayload();
-            boolean success = notifyPositiveUser(cf);
-            return Response.make(success);
+            switch (endpointName) {
+                case "USE_NOTIFICATION":
+                    UseNotificationMessage notice = (UseNotificationMessage) req.getPayload();
+                    data = this.useNotification(notice.swabCode(), notice.getCf());
+                    break;
+                case "NOTIFY_POSITIVE_USER":
+                    String cf = (String) req.getPayload();
+                    data = this.notifyPositiveUser(cf);
+                    break;
+            }
+            return Response.make(data);
         } catch (Exception e) {
-            Logger.getGlobal().warning("Server Internal Error: " + e.getMessage());
-            return Response.error("Server Internal Error");
+            Logger.getGlobal().warning(endpointName + ' ' + e.getMessage());
+            return Response.error("Internal server error");
+//        }
+//            String cf = (String) req.getPayload();
+//            boolean success = notifyPositiveUser(cf);
+//            return Response.make(success);
+//        } catch (Exception e) {
+//            Logger.getGlobal().warning("Server Internal Error: " + e.getMessage());
+//            return Response.error("Server Internal Error");
+//        }
         }
     }
 
@@ -117,7 +133,7 @@ public class AppServer {
                 }
             }
 
-            Logger.getGlobal().info(endpointName);
+            Logger.getGlobal().info("the endpoint is " + endpointName);
             Serializable data = "Internal server error";
             switch (endpointName) {
                 case "login":
@@ -139,13 +155,6 @@ public class AppServer {
                     String code = (String) req.getPayload();
                     data = this.getNotificationSuspensionDate(code, loggedUser);
                     break;
-
-//                case "notifyPositiveUser":
-//                    response = this.notifyPositiveUser(payload.getCf());
-//                    break;
-//                case "useNotification":
-//                    response = this.useNotification(payload.getCode());
-//                    break;
             }
             return Response.make(data);
         } catch (AuthenticationException e) {
@@ -208,8 +217,7 @@ public class AppServer {
     }
 
     public boolean createReport(int id, int duration, Timestamp date, User loggedUser) throws NoSuchAlgorithmException, InvalidKeyException, NotFoundException, InsertFailedException, DeletionFailedException {
-        System.out.println("CONTATTI NEL DB: " + this.database.contacts.size());
-        System.out.println("REPORTS NEL DB: " + this.database.contactReports.size());
+        Logger.getGlobal().info("CONTATTI NEL DB: " + this.database.contacts.size()+", REPORTS NEL DB:" + this.database.contactReports.size());
         byte[] cfReporter = loggedUser.getHashedCf();
         User reportedUser = this.database.findUser(id);
         if (reportedUser == null) {
@@ -225,7 +233,7 @@ public class AppServer {
         //        
         // FASE 1
         // Se il reporter sono io e il reported è la persona che ho appena visto
-        // Certo tutti i report in cui il reported ha visto il reporter
+        // Cerco tutti i report in cui il reported ha visto il reporter
         // Ovvero tutti i report in cui la persona che ho appena visto ha visto me
         List<ContactReport> reports = this.database.searchContactReportsOfUsers(cfReported, cfReporter);
 
@@ -241,6 +249,8 @@ public class AppServer {
         for (ContactReport overlap : overlaps) {
             if (!this.database.addContact(overlap)) {
                 throw new InsertFailedException("Contact creation failed");
+            } else {
+                Logger.getGlobal().info("Contact created successfully");
             }
         }
 
@@ -248,31 +258,40 @@ public class AppServer {
         // Vedo se esiste un report più recente di quello che sto per creare.
         // Un report più recente è un report che finisce dopo.
         // Se NON esiste un report più recente inserisco il report corrente nel database.
-        ContactReport mostRecentReport = newReport;
+        ContactReport mostRecentReport = new ContactReport(
+                newReport.getReporterHashedCf(),
+                newReport.getReportedHashedCf(),
+                newReport.getDuration(),
+                newReport.getStartDate());
+
         for (ContactReport r : reports) {
-            if (r.getEndDate().after(mostRecentReport.getEndDate())) {
-                System.out.println("Assegnato");
+            if (!r.getEndDate().before(mostRecentReport.getEndDate())) {
                 mostRecentReport = r;
             }
         }
 
-        boolean newReportIsMostRecent = mostRecentReport.equals(newReport);
-        if (newReportIsMostRecent) {
-            System.out.println(newReport);
+//        boolean newReportIsMostRecent = mostRecentReport.equals(newReport);
+
+//        Logger.getGlobal().info("Is new report the most recent ? "+ newReportIsMostRecent);
+        Logger.getGlobal().info("is already present? " + this.database.isAlreadyPresentContactReport(newReport));
+
+//        if (newReportIsMostRecent) {
             if (!this.database.addContactReport(newReport)) {
                 throw new InsertFailedException("Contact report creation failed");
+            } else {
+                Logger.getGlobal().info("Report created successfully");
             }
-        }
+//        }
 
         // FASE 4
         // Cancello tutti i report tranne il più recente
-        for (ContactReport r : reports) {
-            if (!r.equals(mostRecentReport)) {
-                if (!this.database.removeContactReport(r.getReporterHashedCf(), r.getReportedHashedCf(), r.getStartDate())) {
-                    throw new DeletionFailedException("Impossible to remove contact");
-                }
-            }
-        }
+//        for (ContactReport r : reports) {
+//            if (!r.equals(mostRecentReport)) {
+//                if (!this.database.removeContactReport(r.getReporterHashedCf(), r.getReportedHashedCf(), r.getStartDate())) {
+//                    throw new DeletionFailedException("Impossible to remove contact");
+//                }
+//            }
+//        }
 
         return true;
     }
