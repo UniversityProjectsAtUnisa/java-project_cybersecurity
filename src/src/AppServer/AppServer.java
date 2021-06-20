@@ -23,6 +23,7 @@ import entities.Notification;
 import exceptions.DeletionFailedException;
 import exceptions.InsertFailedException;
 import exceptions.NotFoundException;
+import exceptions.ServerException;
 import exceptions.UpdateException;
 import java.io.Serializable;
 import utils.Config;
@@ -32,6 +33,7 @@ import javax.naming.AuthenticationException;
 import utils.ContactReportMessage;
 import utils.Credentials;
 import java.util.stream.Collectors;
+import utils.Counter;
 
 /**
  *
@@ -84,7 +86,7 @@ public class AppServer {
             String cf = (String) req.getPayload();
             boolean success = notifyPositiveUser(cf);
             return Response.make(success);
-        } catch(Exception e) {
+        } catch (Exception e) {
             Logger.getGlobal().warning("Server Internal Error: " + e.getMessage());
             return Response.error("Server Internal Error");
         }
@@ -106,7 +108,7 @@ public class AppServer {
                     throw new AuthenticationException("The authentication token is not valid");
                 }
                 Timestamp lastLoginDate = this.database.findUser(token.getId()).getLastLoginDate();
-                if (!token.isValid(lastLoginDate, this.getSalt2())) {
+                if (!token.isValid(lastLoginDate, salt2)) {
                     throw new AuthenticationException("The authentication token is not valid");
                 }
                 loggedUser = this.database.findUser(token.getId());
@@ -130,7 +132,7 @@ public class AppServer {
                     ContactReportMessage createReportData = (ContactReportMessage) req.getPayload();
                     data = this.createReport(createReportData.getIdUserToReport(), createReportData.getDuration(), createReportData.getStartDate(), loggedUser);
                     break;
-                case "getNotifications": 
+                case "getNotifications":
                     data = this.getNotifications(loggedUser);
                     break;
                 case "getNotificationSuspensionDate":
@@ -168,7 +170,7 @@ public class AppServer {
 
         if (Arrays.equals(hashedPassword, user.getHashedPassword())) {
             int id = user.getId();
-            AuthToken token = new AuthToken(id, this.getSalt2());
+            AuthToken token = new AuthToken(id, salt2);
             if (this.database.updateUser(user.getHashedCf(), token.getCreatedAt(), null, null) == null) {
                 throw new UpdateException("User update failed");
             }
@@ -178,7 +180,7 @@ public class AppServer {
     }
 
     public boolean register(String cf, String password) throws NoSuchAlgorithmException, InsertFailedException {
-        if (!healthApiService.checkCf(cf)){
+        if (!healthApiService.checkCf(cf)) {
             return false;
         }
         byte[] userSalt = new byte[32];
@@ -249,12 +251,14 @@ public class AppServer {
         ContactReport mostRecentReport = newReport;
         for (ContactReport r : reports) {
             if (r.getEndDate().after(mostRecentReport.getEndDate())) {
+                System.out.println("Assegnato");
                 mostRecentReport = r;
             }
         }
 
-        boolean anyReportIsMoreRecent = !mostRecentReport.getEndDate().before(newReport.getEndDate());
-        if (!anyReportIsMoreRecent) {
+        boolean newReportIsMostRecent = mostRecentReport.equals(newReport);
+        if (newReportIsMostRecent) {
+            System.out.println(newReport);
             if (!this.database.addContactReport(newReport)) {
                 throw new InsertFailedException("Contact report creation failed");
             }
@@ -264,7 +268,7 @@ public class AppServer {
         // Cancello tutti i report tranne il più recente
         for (ContactReport r : reports) {
             if (!r.equals(mostRecentReport)) {
-                if(!this.database.removeContactReport(r.getReporterId(), r.getReportedId(), r.getStartDate())) {
+                if (!this.database.removeContactReport(r.getReporterHashedCf(), r.getReportedHashedCf(), r.getStartDate())) {
                     throw new DeletionFailedException("Impossible to remove contact");
                 }
             }
@@ -281,13 +285,16 @@ public class AppServer {
                 .collect(Collectors.toCollection(LinkedList::new));
     }
 
-    public boolean useNotification(String code) throws NotFoundException, UpdateException {
-        // TODO: MANCA
+    public boolean useNotification(String code, String cf) throws ServerException, InvalidKeyException, NoSuchAlgorithmException {
         Notification notification = this.database.searchNotification(code);
         if (notification == null) {
             throw new NotFoundException("Notification with given code not found");
         }
-        if(this.database.updateNotification(code, ServerUtils.getNow()) == null){
+        if (!notification.getToken().isValid(cf, salt1, salt2)) {
+            throw new ServerException("Provided cf is invalid for this notificationToken");
+        }
+
+        if (this.database.updateNotification(code, ServerUtils.getNow()) == null) {
             throw new UpdateException("Impossible to update notification");
         }
         return true;
@@ -304,66 +311,101 @@ public class AppServer {
         return notification.getSuspensionDate();
     }
 
-    public boolean notifyPositiveUser(String cf) throws NoSuchAlgorithmException, InvalidKeyException, NotFoundException, UpdateException {
-        // TODO: MANCA
+    public boolean notifyPositiveUser(String cf) throws NoSuchAlgorithmException, InvalidKeyException, ServerException {
         byte[] cfBytes = ServerUtils.toByteArray(cf);
         byte[] hashedCf = encryptCf(cfBytes);
         User user = this.database.findUser(hashedCf);
         if (user == null) {
-            throw new NotFoundException("User not found");
+            return false;
         }
+        Timestamp lastValidDateForContact = ServerUtils.getLastValidDateForContact();
         List<Contact> contacts = this.database
                 .searchContactsOfUser(hashedCf)
                 .stream()
-                .filter(contact -> contact.getEndDate().after(ServerUtils.getLastValidDateForContact()))
+                .filter(contact -> contact.getEndDate().after(lastValidDateForContact))
                 .toList();
         if (this.database.updateUser(hashedCf, null, null, ServerUtils.getNow()) == null) {
             throw new UpdateException("Impossibile to update user");
         }
 
-        // algorithm
-        Map<User, Integer> durationMap = new HashMap<>();
+        Counter<User> millisCounter = new Counter<>();
         for (Contact c : contacts) {
-            User user_i = this.database.findUser(c.getReporterId());
-            User user_j = this.database.findUser(c.getReportedId());
-            LocalDateTime datetime = LocalDateTime.now();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd H:mm:ss");
-
-            datetime = datetime.minusHours(480);
-            String afterSubtraction = datetime.format(formatter);
-            Timestamp timestampAfterSubtraction = Timestamp.valueOf(afterSubtraction);
-            if (user_i.getLastPositiveSwabDate() != null
-                    && (user_i.getLastPositiveSwabDate().after(timestampAfterSubtraction)
-                    || c.getStartDate().after(user_i.getLastPositiveSwabDate()))) {
-                int prevValue = durationMap.get(user_j) == null ? 0 : durationMap.get(user_j);
-                durationMap.put(user_j, (Integer) prevValue + c.getDuration());
+            byte[] otherUserHashedCf = c.getOtherUserHashedCf(hashedCf);
+            if (otherUserHashedCf == null) {
+                throw new ServerException("Contact list is invalid");
             }
-            if (user_j.getLastPositiveSwabDate() != null
-                    && (user_j.getLastPositiveSwabDate().after(timestampAfterSubtraction)
-                    || c.getStartDate().after(user_j.getLastPositiveSwabDate()))) {
-                int prevValue = durationMap.get(user_i) == null ? 0 : durationMap.get(user_i);
-                durationMap.put(user_i, (Integer) prevValue + c.getDuration());
+            User otherUser = this.database.findUser(otherUserHashedCf);
+            if (otherUser == null) {
+                throw new NotFoundException("User not found");
             }
 
+            Timestamp otherUserSwabDate = otherUser.getLastPositiveSwabDate();
+            if (otherUserSwabDate == null) {
+                otherUserSwabDate = lastValidDateForContact;
+            }
+
+            Timestamp contactEndDate = c.getEndDate();
+            int contactDuration = c.getDuration();
+            if (contactEndDate.after(otherUserSwabDate)) {
+                millisCounter.add(otherUser, contactDuration);
+            }
         }
-        // end algorithm
-        durationMap.entrySet().forEach(entry -> {
-            int value = entry.getValue();
-            User u = entry.getKey();
-            if (value > Config.RISK_MINUTES) {
-                NotificationToken token = null;
-                try {
-                    Timestamp expireDate = Timestamp.valueOf(ServerUtils.getNow().toLocalDateTime().plusDays(Config.EXPIRE_DAYS));
-                    token = new NotificationToken(u.getId(), expireDate, ServerUtils.toString(u.getHashedCf()),
-                            this.getSalt1(), this.getSalt2());
-                    String code = token.getCode();
-                    this.database.addNotification(code);
-                    this.database.updateUser(u.getHashedCf(), null, ServerUtils.getNow(), null);
-                } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-                    e.printStackTrace();
+
+        List<User> usersAtRisk = millisCounter.mostCommon(Config.RISK_MINUTES * 60 * 1000);
+        NotificationToken token = null;
+        for (User u : usersAtRisk) {
+            try {
+                Timestamp expireDate = ServerUtils.getNotificationTokenExpireDays();
+                token = new NotificationToken(u.getId(), expireDate, u.getHashedCf(), salt2);
+                if(!this.database.addNotification(token)) {
+                    throw new InsertFailedException("Failed to add notification");
                 }
+                if(this.database.updateUser(u.getHashedCf(), null, ServerUtils.getNow(), null) == null) {
+                    throw new UpdateException("Failed to update user");
+                }
+            } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+                e.printStackTrace();
             }
-        });
+        }
+
+//        // algorithm
+//        Map<User, Integer> durationMap = new HashMap<>();
+//        for (Contact c : contacts) {
+//            User user_i = this.database.findUser(c.getReporterHashedCf());
+//            User user_j = this.database.findUser(c.getReportedHashedCf());
+//
+//            if (user_i.getLastPositiveSwabDate() != null
+//                    && (user_i.getLastPositiveSwabDate().after(lastValidDateForContact)
+//                    || c.getStartDate().after(user_i.getLastPositiveSwabDate()))) {
+//                int prevValue = durationMap.get(user_j) == null ? 0 : durationMap.get(user_j);
+//                durationMap.put(user_j, (Integer) prevValue + c.getDuration());
+//            }
+//            if (user_j.getLastPositiveSwabDate() != null
+//                    && (user_j.getLastPositiveSwabDate().after(lastValidDateForContact)
+//                    || c.getStartDate().after(user_j.getLastPositiveSwabDate()))) {
+//                int prevValue = durationMap.get(user_i) == null ? 0 : durationMap.get(user_i);
+//                durationMap.put(user_i, (Integer) prevValue + c.getDuration());
+//            }
+//
+//        }
+//        // end algorithm
+//        durationMap.entrySet().forEach(entry -> {
+//            int value = entry.getValue();
+//            User u = entry.getKey();
+//            if (value > Config.RISK_MINUTES) {
+//                NotificationToken token = null;
+//                try {
+//                    Timestamp expireDate = Timestamp.valueOf(ServerUtils.getNow().toLocalDateTime().plusDays(Config.NOTIFICATION_EXPIRE_DAYS));
+//                    token = new NotificationToken(u.getId(), expireDate, ServerUtils.toString(u.getHashedCf()),
+//                            this.getSalt1(), this.getSalt2());
+//                    String code = token.getCode();
+//                    this.database.addNotification(code);
+//                    this.database.updateUser(u.getHashedCf(), null, ServerUtils.getNow(), null);
+//                } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+//                    e.printStackTrace();
+//                }
+//            }
+//        });
 
         return true;
 

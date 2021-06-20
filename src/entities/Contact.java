@@ -16,12 +16,28 @@ import src.AppServer.ServerUtils;
  */
 public class Contact extends ContactReport {
 
-    public Contact(byte[] reporterId, byte[] reportedId, int duration, Timestamp startDate) {
-        super(reporterId, reportedId, duration, startDate);
+    public Contact(byte[] reporterHashedCf, byte[] reportedHashedCf, int duration, Timestamp startDate) {
+        super(reporterHashedCf, reportedHashedCf, duration, startDate);
     }
 
     public Contact(ContactReport report) {
-        super(report.getReporterId(), report.getReportedId(), report.getDuration(), report.getStartDate());
+        super(report.getReporterHashedCf(), report.getReportedHashedCf(), report.getDuration(), report.getStartDate());
+    }
+
+    public byte[] getOtherUserHashedCf(byte[] notThisHashedCf) {
+        if (Arrays.equals(this.getReporterHashedCf(), notThisHashedCf)) {
+            if (!Arrays.equals(this.getReportedHashedCf(), notThisHashedCf)) {
+                return this.getReportedHashedCf();
+            }
+            return null;
+        }
+        if (Arrays.equals(this.getReportedHashedCf(), notThisHashedCf)) {
+            if (!Arrays.equals(this.getReporterHashedCf(), notThisHashedCf)) {
+                return this.getReporterHashedCf();
+            }
+            return null;
+        }
+        return null;
     }
 
     @Override
@@ -33,13 +49,13 @@ public class Contact extends ContactReport {
             return false;
         }
         ContactReport that = (ContactReport) o;
-        return this.getDuration() == that.getDuration() && ((Arrays.equals(getReporterId(), that.getReportedId()) && Arrays.equals(getReportedId(), that.getReportedId()))
-                || (Arrays.equals(getReporterId(), that.getReportedId()) && Arrays.equals(getReportedId(), that.getReporterId()))) && getStartDate().equals(that.getStartDate());
+        return this.getDuration() == that.getDuration() && ((Arrays.equals(getReporterHashedCf(), that.getReportedHashedCf()) && Arrays.equals(getReportedHashedCf(), that.getReportedHashedCf()))
+                || (Arrays.equals(getReporterHashedCf(), that.getReportedHashedCf()) && Arrays.equals(getReportedHashedCf(), that.getReporterHashedCf()))) && getStartDate().equals(that.getStartDate());
     }
 
     @Override
     public String toString() {
-        return MessageFormat.format("[Contact: {0}, {1}, {2}, {3}]", ServerUtils.toString(this.getReporterId()), ServerUtils.toString(this.getReportedId()), this.getDuration(), this.getStartDate());
+        return MessageFormat.format("[Contact: {0}, {1}, {2}, {3}]", ServerUtils.toString(this.getReporterHashedCf()), ServerUtils.toString(this.getReportedHashedCf()), this.getDuration(), this.getStartDate());
     }
 
 }
