@@ -117,7 +117,7 @@ public class AppServer {
                 }
             }
 
-            Logger.getGlobal().info(endpointName);
+            Logger.getGlobal().info("the endpoint is " + endpointName);
             Serializable data = "Internal server error";
             switch (endpointName) {
                 case "login":
@@ -208,8 +208,7 @@ public class AppServer {
     }
 
     public boolean createReport(int id, int duration, Timestamp date, User loggedUser) throws NoSuchAlgorithmException, InvalidKeyException, NotFoundException, InsertFailedException, DeletionFailedException {
-        System.out.println("CONTATTI NEL DB: " + this.database.contacts.size());
-        System.out.println("REPORTS NEL DB: " + this.database.contactReports.size());
+        Logger.getGlobal().info("CONTATTI NEL DB: " + this.database.contacts.size()+", REPORTS NEL DB:" + this.database.contactReports.size());
         byte[] cfReporter = loggedUser.getHashedCf();
         User reportedUser = this.database.findUser(id);
         if (reportedUser == null) {
@@ -241,6 +240,8 @@ public class AppServer {
         for (ContactReport overlap : overlaps) {
             if (!this.database.addContact(overlap)) {
                 throw new InsertFailedException("Contact creation failed");
+            } else {
+                Logger.getGlobal().info("Contact created successfully");
             }
         }
 
@@ -248,31 +249,40 @@ public class AppServer {
         // Vedo se esiste un report più recente di quello che sto per creare.
         // Un report più recente è un report che finisce dopo.
         // Se NON esiste un report più recente inserisco il report corrente nel database.
-        ContactReport mostRecentReport = newReport;
+        ContactReport mostRecentReport = new ContactReport(
+                newReport.getReporterHashedCf(),
+                newReport.getReportedHashedCf(),
+                newReport.getDuration(),
+                newReport.getStartDate());
+
         for (ContactReport r : reports) {
-            if (r.getEndDate().after(mostRecentReport.getEndDate())) {
-                System.out.println("Assegnato");
+            if (!r.getEndDate().before(mostRecentReport.getEndDate())) {
                 mostRecentReport = r;
             }
         }
 
-        boolean newReportIsMostRecent = mostRecentReport.equals(newReport);
-        if (newReportIsMostRecent) {
-            System.out.println(newReport);
+//        boolean newReportIsMostRecent = mostRecentReport.equals(newReport);
+
+//        Logger.getGlobal().info("Is new report the most recent ? "+ newReportIsMostRecent);
+        Logger.getGlobal().info("is already present? " + this.database.isAlreadyPresentContactReport(newReport));
+
+//        if (newReportIsMostRecent) {
             if (!this.database.addContactReport(newReport)) {
                 throw new InsertFailedException("Contact report creation failed");
+            } else {
+                Logger.getGlobal().info("Report created successfully");
             }
-        }
+//        }
 
         // FASE 4
         // Cancello tutti i report tranne il più recente
-        for (ContactReport r : reports) {
-            if (!r.equals(mostRecentReport)) {
-                if (!this.database.removeContactReport(r.getReporterHashedCf(), r.getReportedHashedCf(), r.getStartDate())) {
-                    throw new DeletionFailedException("Impossible to remove contact");
-                }
-            }
-        }
+//        for (ContactReport r : reports) {
+//            if (!r.equals(mostRecentReport)) {
+//                if (!this.database.removeContactReport(r.getReporterHashedCf(), r.getReportedHashedCf(), r.getStartDate())) {
+//                    throw new DeletionFailedException("Impossible to remove contact");
+//                }
+//            }
+//        }
 
         return true;
     }
