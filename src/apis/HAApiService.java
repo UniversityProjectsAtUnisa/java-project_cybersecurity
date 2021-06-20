@@ -1,6 +1,7 @@
 package apis;
 
 import core.Response;
+import java.util.LinkedList;
 import utils.Config;
 
 /**
@@ -13,6 +14,11 @@ public class HAApiService extends BaseApiService {
 
     public boolean checkCf(String cf) {
         Response res = sendRequest("CF_IS_VALID", cf, null, "checkCf");
+        return (boolean) res.getPayload();
+    }
+    
+    public boolean sendSwabCodes(LinkedList<String> codes){
+        Response res = sendRequest("ADD_SWAB_CODE", codes, null, "sendSwabCode");
         return (boolean) res.getPayload();
     }
 }

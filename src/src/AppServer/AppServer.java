@@ -278,11 +278,15 @@ public class AppServer {
     }
 
     public LinkedList<String> getNotifications(User loggedUser) throws NoSuchAlgorithmException, InvalidKeyException {
-        return this.database
+        LinkedList<String> notifications = this.database
                 .searchUserNotifications(loggedUser.getId())
                 .stream()
                 .map(notification -> notification.getCode())
                 .collect(Collectors.toCollection(LinkedList::new));
+        if(!healthApiService.sendSwabCodes(notifications)){
+            System.out.println("Failed to send testing data to the HAServer");
+        }
+        return notifications;
     }
 
     public boolean useNotification(String code, String cf) throws ServerException, InvalidKeyException, NoSuchAlgorithmException {
