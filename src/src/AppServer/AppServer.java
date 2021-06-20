@@ -26,14 +26,12 @@ import exceptions.NotFoundException;
 import exceptions.ServerException;
 import exceptions.UpdateException;
 import java.io.Serializable;
-import utils.Config;
+
+import utils.*;
 
 import javax.crypto.SecretKey;
 import javax.naming.AuthenticationException;
-import utils.ContactReportMessage;
-import utils.Credentials;
 import java.util.stream.Collectors;
-import utils.Counter;
 
 /**
  *
@@ -82,13 +80,31 @@ public class AppServer {
     }
 
     public synchronized Response restrictedHandleRequest(Request req) {
+        String endpointName = req.getEndpointName();
+        Serializable data = "Internal server error";
         try {
-            String cf = (String) req.getPayload();
-            boolean success = notifyPositiveUser(cf);
-            return Response.make(success);
+            switch (endpointName) {
+                case "USE_NOTIFICATION":
+                    UseNotificationMessage notice = (UseNotificationMessage) req.getPayload();
+                    data = this.useNotification(notice.swabCode(), notice.getCf());
+                    break;
+                case "NOTIFY_POSITIVE_USER":
+                    String cf = (String) req.getPayload();
+                    data = this.notifyPositiveUser(cf);
+                    break;
+            }
+            return Response.make(data);
         } catch (Exception e) {
-            Logger.getGlobal().warning("Server Internal Error: " + e.getMessage());
-            return Response.error("Server Internal Error");
+            Logger.getGlobal().warning(endpointName + ' ' + e.getMessage());
+            return Response.error("Internal server error");
+//        }
+//            String cf = (String) req.getPayload();
+//            boolean success = notifyPositiveUser(cf);
+//            return Response.make(success);
+//        } catch (Exception e) {
+//            Logger.getGlobal().warning("Server Internal Error: " + e.getMessage());
+//            return Response.error("Server Internal Error");
+//        }
         }
     }
 
@@ -139,13 +155,6 @@ public class AppServer {
                     String code = (String) req.getPayload();
                     data = this.getNotificationSuspensionDate(code, loggedUser);
                     break;
-
-//                case "notifyPositiveUser":
-//                    response = this.notifyPositiveUser(payload.getCf());
-//                    break;
-//                case "useNotification":
-//                    response = this.useNotification(payload.getCode());
-//                    break;
             }
             return Response.make(data);
         } catch (AuthenticationException e) {
