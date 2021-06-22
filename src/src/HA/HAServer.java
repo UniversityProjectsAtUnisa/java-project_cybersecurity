@@ -4,6 +4,7 @@ import apis.RestrictedServerApiService;
 import core.Request;
 import core.Response;
 import core.SSLServer;
+import exceptions.RequestFailedException;
 import utils.Config;
 import utils.SimulationData;
 
@@ -115,10 +116,14 @@ public class HAServer extends SSLServer {
         String testCf = RandomUtils.pickOne(SimulationData.VALID_CF_LIST);
         String testCode = RandomUtils.pickOne(availableNotificationTokens);
         if (testCf != null && testCode != null) {
-            if (restrictedServerApiService.useNotification(testCode, testCf)) {
-                availableNotificationTokens.remove(testCode);
-                nextPositiveUsers.add(testCf);
-                Logger.getGlobal().info("Successfully used notification " + testCode);
+            try {
+                if (restrictedServerApiService.useNotification(testCode, testCf)) {
+                    availableNotificationTokens.remove(testCode);
+                    nextPositiveUsers.add(testCf);
+                    Logger.getGlobal().info("Successfully used notification " + testCode);
+                }
+            } catch (RequestFailedException e) {
+                Logger.getGlobal().info("Failed to use notification");
             }
         }
     }

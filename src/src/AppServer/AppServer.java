@@ -96,7 +96,6 @@ public class AppServer {
             }
             return Response.make(data);
         } catch (Exception e) {
-            e.printStackTrace();
             Logger.getGlobal().warning(endpointName + ' ' + e.getMessage());
             return Response.error("Internal server error");
 //        }
@@ -163,7 +162,6 @@ public class AppServer {
             Logger.getGlobal().warning(endpointName + ' ' + e.getMessage());
             return Response.error(e.getMessage());
         } catch (Exception e) {
-            e.printStackTrace();
             Logger.getGlobal().warning(endpointName + ' ' + e.getMessage());
             return Response.error("Internal server error");
         }

@@ -70,7 +70,7 @@ public class AppClient {
     public void fetchNotifications() {
         if (appState != AppClientState.LOGGED) throw new RuntimeException();
         List<Notification> notifications = serverApi.getNotifications(token);
-        String log = String.format("User(%d) Notifications: %s", token.getId(), notifications);
+        String log = String.format("User(%d) has %d notifications", token.getId(), notifications.size());
         Logger.getGlobal().info(log);
     }
 
@@ -92,7 +92,7 @@ public class AppClient {
         if (userCounter.containsKey(id)) {
             ContactCounter cc = userCounter.get(id);
             cc.increment();
-            if (cc.count >= Config.N_CUM) {  // if reach the limit
+            if (cc.count >= Config.N_CUM) {  // limit reached
                 terminateContact(id);
             }
         } else {
