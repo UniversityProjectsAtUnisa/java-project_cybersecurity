@@ -87,7 +87,7 @@ public class AppServer {
     private final SSLServer publicServer, restrictedServer;
     private AuthToken token;
 
-    public AppServer(String password) throws IOException {
+    public AppServer(String password) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
         publicServer = new SSLServer(Config.SERVER_KEYSTORE, Config.SERVER_TRUSTSTORE, password, Config.APP_SERVER_PORT) {
             @Override
             protected Response handleRequest(Request req) {
@@ -104,21 +104,24 @@ public class AppServer {
         this.database = new Database();
 
         SecretKey key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "saltCf");
-        this.saltCf = ServerUtils.toString(key1.getEncoded());
-        key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "keyToken");
-        this.keyToken = ServerUtils.toString(key1.getEncoded());
+        this.saltCf = key1.getEncoded();
+
         key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "seedPassword");
-        this.seedPassword = ServerUtils.toString(key1.getEncoded());
+        this.seedPassword = key1.getEncoded();
         key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "seedToken");
-        this.seedToken = ServerUtils.toString(key1.getEncoded());
+        this.seedToken = key1.getEncoded();
         key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "saltToken");
-        this.saltToken = ServerUtils.toString(key1.getEncoded());
+        this.saltToken = key1.getEncoded();
         key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "saltSwab");
-        this.saltSwab = ServerUtils.toString(key1.getEncoded());
+        this.saltSwab = key1.getEncoded();
         key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "saltCode");
-        this.saltCode = ServerUtils.toString(key1.getEncoded());
+        this.saltCode = key1.getEncoded();
+
+
+        key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "keyToken");
+        this.keyToken = key1.getEncoded();
         key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "keySwab");
-        this.keySwab = ServerUtils.toString(key1.getEncoded());
+        this.keySwab = key1.getEncoded();
 
     }
 
