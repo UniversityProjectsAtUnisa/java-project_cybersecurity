@@ -8,6 +8,7 @@ package core.tokens;
 import src.AppServer.ServerUtils;
 
 import javax.crypto.Mac;
+import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.Serializable;
 import java.security.InvalidKeyException;
@@ -27,6 +28,7 @@ public abstract class Token implements Serializable {
 
     private String payload;
     private String sigma;
+
 
     public Token(String payload, byte[] key) throws InvalidKeyException, NoSuchAlgorithmException {
         this.payload = payload;

@@ -5,45 +5,74 @@
  */
 package entities;
 
+import src.AppServer.ServerUtils;
+
+import javax.crypto.*;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.Objects;
 
 /**
+ *
  */
-public class User implements Comparable<User> {
+public class User {
 
     private final byte[] hashedCf;
-    private final int id;
     private byte[] hashedPassword;
-    private byte[] userSalt;
     private Timestamp lastLoginDate;
-    private Timestamp lastPositiveSwabDate;
-    private Timestamp lastSwabCreationDate;
+    private byte[] info;
 
-    
-    public User(int id, byte[] hashedCf, byte[] hashedPassword, byte[] userSalt,
-            Timestamp lastLoginDate, Timestamp lastSwabCreationDate,
-            Timestamp lastPositiveSwabDate) {
-        this.id = id;
+    Cipher cipher = Cipher.getInstance("AES/CRC/PKCS5Padding");
+
+    public User(byte[] hashedCf, byte[] hashedPassword, byte[] passwordSalt,
+                Timestamp minimumSeedDate, Timestamp lastRiskRequestDate,
+                boolean hadRequestSeed, boolean isPositive,
+                SecretKey keyInfo) throws InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException,
+            IllegalBlockSizeException, BadPaddingException {
         this.hashedCf = hashedCf;
         this.hashedPassword = hashedPassword;
-        this.userSalt = userSalt;
-        this.lastLoginDate = lastLoginDate;
-        this.lastSwabCreationDate = lastSwabCreationDate;
-        this.lastPositiveSwabDate = lastPositiveSwabDate;
+        this.lastLoginDate = null;
+        this.info = encryptInfo(passwordSalt, minimumSeedDate, lastRiskRequestDate, hadRequestSeed, isPositive, keyInfo);
     }
-    
-    public User(int id, byte[] hashedCf, byte[] hashedPassword, byte[] userSalt) {
-        this(id, hashedCf, hashedPassword, userSalt, null, null, null);
+    public User(byte[] hashedCf, byte[] hashedPassword, byte[] passwordSalt,
+                Timestamp lastLoginDate, Timestamp minimumSeedDate, Timestamp lastRiskRequestDate,
+                boolean hadRequestSeed, boolean isPositive,
+                SecretKey keyInfo) throws InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException,
+            IllegalBlockSizeException, BadPaddingException {
+        this.hashedCf = hashedCf;
+        this.hashedPassword = hashedPassword;
+        this.lastLoginDate = lastLoginDate;
+        this.info = encryptInfo(passwordSalt, minimumSeedDate, lastRiskRequestDate, hadRequestSeed, isPositive, keyInfo);
+    }
+
+    public User(byte[] hashedCf, byte[] hashedPassword, byte[] passwordSalt, SecretKey keyInfo)
+            throws InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException,
+            IllegalBlockSizeException, BadPaddingException {
+        this.hashedCf = hashedCf;
+        this.hashedPassword = hashedPassword;
+        this.lastLoginDate = lastLoginDate;
+        this.info = encryptInfo(passwordSalt, null, null, false, false, keyInfo);
+    }
+
+    private byte[] encryptInfo(byte[] passwordSalt,
+                               Timestamp minimumSeedDate, Timestamp lastRiskRequestDate,
+                               boolean hadRequestSeed, boolean isPositive,
+                               SecretKey keyInfo) throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+        String info =
+                passwordSalt.toString() + "_" +
+                minimumSeedDate.toString() + "_" +
+                isPositive + "_" +
+                lastRiskRequestDate.toString() + "_" +
+                hadRequestSeed;
+
+        cipher.init(Cipher.ENCRYPT_MODE, keyInfo);
+        return cipher.doFinal(ServerUtils.toByteArray(info));
     }
 
     public byte[] getHashedCf() {
         return hashedCf;
-    }
-
-    public int getId() {
-        return id;
     }
 
     public byte[] getHashedPassword() {
@@ -54,14 +83,6 @@ public class User implements Comparable<User> {
         this.hashedPassword = hashedPassword;
     }
 
-    public byte[] getUserSalt() {
-        return userSalt;
-    }
-
-    public void setUserSalt(byte[] userSalt) {
-        this.userSalt = userSalt;
-    }
-
     public Timestamp getLastLoginDate() {
         return lastLoginDate;
     }
@@ -70,20 +91,12 @@ public class User implements Comparable<User> {
         this.lastLoginDate = lastLoginDate;
     }
 
-    public Timestamp getLastPositiveSwabDate() {
-        return lastPositiveSwabDate;
+    public byte[] getInfo() {
+        return info;
     }
 
-    public void setLastPositiveSwabDate(Timestamp lastPositiveSwabDate) {
-        this.lastPositiveSwabDate = lastPositiveSwabDate;
-    }
-
-    public Timestamp getLastSwabCreationDate() {
-        return lastSwabCreationDate;
-    }
-
-    public void setLastSwabCreationDate(Timestamp lastSwabCreationDate) {
-        this.lastSwabCreationDate = lastSwabCreationDate;
+    public void setInfo(byte[] info) {
+        this.info = info;
     }
 
     @Override
@@ -95,24 +108,12 @@ public class User implements Comparable<User> {
             return false;
         }
         User user = (User) o;
-        return id == user.id;
+        return hashedCf == user.getHashedCf();
     }
 
     @Override
     public int hashCode() {
-        int hash = 5;
-        hash = 59 * hash + Arrays.hashCode(this.hashedCf);
-        hash = 59 * hash + this.id;
-        hash = 59 * hash + Arrays.hashCode(this.hashedPassword);
-        hash = 59 * hash + Arrays.hashCode(this.userSalt);
-        hash = 59 * hash + Objects.hashCode(this.lastLoginDate);
-        hash = 59 * hash + Objects.hashCode(this.lastPositiveSwabDate);
-        hash = 59 * hash + Objects.hashCode(this.lastSwabCreationDate);
-        return hash;
+        return Arrays.hashCode(hashedCf);
     }
 
-    @Override
-    public int compareTo(User u) {
-        return this.getId() - u.getId();
-    }
 }

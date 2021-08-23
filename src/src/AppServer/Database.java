@@ -6,13 +6,15 @@
 package src.AppServer;
 
 import core.tokens.NotificationToken;
-import entities.Contact;
-import entities.ContactReport;
-import entities.Notification;
-import entities.User;
+import entities.*;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.*;
 import java.util.logging.Level;
@@ -23,41 +25,31 @@ import java.util.logging.Logger;
  */
 public class Database {
 
-    //    Comparator.comparing(Report::getReportKey)
-//            .thenComparing(Report::getStudentNumber)
-//            .thenComparing(Report::getSchool)
+    private HashMap<byte[], User> users = new HashMap<>();
+    private HashMap<byte[], Swab> swabs = new HashMap<>();
+    private HashMap<byte[], PositiveContact> positiveContacts = new HashMap<>();
 
-    private static int usersCount = 0;
-    // TODO: Rimetti private
-    private Comparator<ContactReport> cmpContacts =  Comparator.comparing
-            (ContactReport::getStartDate)
-            .thenComparing(ContactReport::getDuration)
-            .thenComparing((e1, e2) -> Arrays.compare(e1.getReporterHashedCf(), e2.getReporterHashedCf()))
-            .thenComparing((e1, e2) -> Arrays.compare(e1.getReportedHashedCf(), e2.getReportedHashedCf()));
-    final HashMap<Integer, User> users = new HashMap<>();
-    final TreeSet<ContactReport> contactReports = new TreeSet<>(cmpContacts);
-    final TreeSet<Contact> contacts = new TreeSet<>(cmpContacts);
-    final TreeSet<Notification> notifications = new TreeSet<>();
+    // ----------------------------------------------------------------------------------------------------------------
+    // USER
 
-    public boolean addUser(byte[] hashedCf, byte[] password, byte[] userSalt) {
-        return users.putIfAbsent(++usersCount, new User(usersCount, hashedCf, password, userSalt)) == null;
+    public boolean addUser(byte[] hashedCf, byte[] password, byte[] passwordSalt, SecretKey keyInfo)
+            throws NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException,
+            BadPaddingException, InvalidKeyException {
+        User u = new User(hashedCf, password, passwordSalt, keyInfo);
+        return users.putIfAbsent(hashedCf, u) == null;
+    }
+
+    public boolean removeUser(byte[] hashedCf) throws NoSuchPaddingException, IllegalBlockSizeException,
+            NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
+        return users.remove(hashedCf) != null;
     }
 
     public User findUser(byte[] hashedCf) {
-        for (User user : users.values()) {
-            if (Arrays.equals(user.getHashedCf(), hashedCf)) {
-                return user;
-            }
-        }
-        return null;
+        return users.get(hashedCf);
     }
 
-    public User findUser(int id) {
-        return users.get(id);
-    }
-
-    public User updateUser(byte[] hashedCf, Timestamp lastLoginDate, Timestamp lastSwabCreationDate,
-                           Timestamp lastPositiveSwabDate) {
+    public User updateUser(byte[] hashedCf, byte[] hashedPassword, byte[] passwordSalt, Timestamp lastLoginDate,
+                           Timestamp minimumSeedDate, Timestamp lastRiskRequestDate) {
         User user = findUser(hashedCf);
         if (user == null) {
             return null;
@@ -65,140 +57,190 @@ public class Database {
         if (lastLoginDate != null) {
             user.setLastLoginDate(lastLoginDate);
         }
-        if (lastPositiveSwabDate != null) {
-            user.setLastSwabCreationDate(lastPositiveSwabDate);
+        if (hashedPassword != null && passwordSalt != null) {
+            String[] info = user.getInfo().toString().split("_");
+            info[0] = passwordSalt.toString();
+            user.setHashedPassword(hashedPassword);
+            user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
         }
-        if (lastPositiveSwabDate != null) {
-            user.setLastPositiveSwabDate(lastPositiveSwabDate);
+        if (minimumSeedDate != null) {
+            String[] info = user.getInfo().toString().split("_");
+            info[1] = minimumSeedDate.toString();
+            user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
+        }
+        if (lastRiskRequestDate != null) {
+            String[] info = user.getInfo().toString().split("_");
+            info[3] = lastRiskRequestDate.toString();
+            user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
         }
         return user;
     }
-
-    public boolean removeUser(byte[] hashedCf) {
-        int userId = findUser(hashedCf).getId();
-        return users.remove(userId) != null;
-    }
-
-    public boolean removeUser(int id) {
-        return users.remove(id) != null;
-    }
-
-    public boolean addContactReport(byte[] reporterId, byte[] reportedId, int duration, Timestamp startContactDate) {
-        return contactReports.add(new ContactReport(reporterId, reportedId, duration, startContactDate));
-    }
-
-    public boolean addContactReport(ContactReport report) {
-        return contactReports.add(report);
-    }
-
-    public ContactReport searchContactReport(byte[] reporterId, byte[] reportedId, Timestamp startContactDate) {
-        for (ContactReport contactReport : contactReports) {
-            if (Arrays.equals(contactReport.getReporterHashedCf(), reporterId) &&
-                    Arrays.equals(contactReport.getReportedHashedCf(), reportedId) &&
-                    contactReport.getStartDate().equals(startContactDate)) {
-                return contactReport;
-            }
-        }
-        return null;
-    }
-
-    //dev
-    public boolean isAlreadyPresentContactReport(ContactReport c) {
-        return this.contactReports.contains(c);
-    }
-
-    public List<ContactReport> searchContactReportsOfUsers(byte[] reporterId, byte[] reportedId) {
-        return contactReports
-                .stream()
-                .filter(report -> Arrays.equals(report.getReporterHashedCf(), reporterId)
-                        && Arrays.equals(report.getReportedHashedCf(), reportedId))
-                .toList();
-    }
-
-    public List<ContactReport> searchContactReportOfReported(byte[] reportedId) {
-        return contactReports.stream().filter(report -> Arrays.equals(report.getReportedHashedCf(), reportedId)).toList();
-    }
-
-    public boolean removeContactReport(byte[] reporterId, byte[] reportedId, Timestamp startContactDate) {
-        return contactReports.remove(searchContactReport(reporterId, reportedId, startContactDate));
-    }
-
-    public boolean addContact(byte[] reporterId, byte[] reportedId, int duration, Timestamp startContactDate) {
-        return contacts.add(new Contact(reporterId, reportedId, duration, startContactDate));
-    }
-
-    public boolean addContact(ContactReport report) {
-        System.out.println("CREAZIONE CONTATTO");
-        Logger.getGlobal().log(Level.INFO, "Contact: {0}", report.toString());
-        return contacts.add(new Contact(report));
-    }
-
-    public Contact searchContact(byte[] reporterId, byte[] reportedId, Timestamp startDate) {
-        for (Contact contact : contacts) {
-            // La data di inizio è uguale
-            if (contact.getStartDate().equals(startDate)
-                    // Il contatto è bidirezionale
-                    && (Arrays.equals(contact.getReporterHashedCf(), reporterId) && Arrays.equals(contact.getReportedHashedCf(), reportedId)
-                    || (Arrays.equals(contact.getReporterHashedCf(), reportedId) && Arrays.equals(contact.getReportedHashedCf(), reporterId)))) {
-                return contact;
-            }
-        }
-        return null;
-    }
-
-    public List<Contact> searchContactsOfUser(byte[] userId) {
-
-        return contacts
-                .stream()
-                .filter(contact -> Arrays.equals(contact.getReporterHashedCf(), userId) || Arrays.equals(contact.getReportedHashedCf(), userId))
-                .toList();
-    }
-
-    public boolean removeContact(byte[] reporterId, byte[] reportedId, Timestamp startContactDate) {
-        return contacts.remove(searchContact(reporterId, reportedId, startContactDate));
-    }
-
-    public boolean removeContactsUser(byte[] userId) {
-        return contacts.removeAll(searchContactsOfUser(userId));
-    }
-
-    public boolean addNotification(String code) throws InvalidKeyException, NoSuchAlgorithmException {
-        return notifications.add(new Notification(code));
-    }
-
-    public boolean addNotification(NotificationToken token) throws InvalidKeyException, NoSuchAlgorithmException {
-        return notifications.add(new Notification(token));
-    }
-
-    public boolean addNotification(Notification n) throws InvalidKeyException, NoSuchAlgorithmException {
-        return notifications.add(n);
-    }
-
-
-    public Notification searchNotification(String code) {
-        for (Notification notification : notifications) {
-            if (notification.getCode().equals(code)) {
-                return notification;
-            }
-        }
-        return null;
-    }
-
-    public List<Notification> searchUserNotifications(int id) {
-        return notifications.stream().filter(notification -> notification.getId() == id).toList();
-    }
-
-    public Notification updateNotification(String code, Timestamp suspensionDate) {
-        Notification notification = searchNotification(code);
-        if (notification == null) {
+    public User updateUser(byte[] hashedCf, byte[] hashedPassword, byte[] passwordSalt, Timestamp lastLoginDate,
+                           Timestamp minimumSeedDate, Timestamp lastRiskRequestDate,
+                           boolean hadRequestSeed, boolean isPositive) {
+        User user = findUser(hashedCf);
+        if (user == null) {
             return null;
         }
-        notification.setSuspensionDate(suspensionDate);
-        return notification;
+        if (lastLoginDate != null) {
+            user.setLastLoginDate(lastLoginDate);
+        }
+        if (hashedPassword != null && passwordSalt != null) {
+            String[] info = user.getInfo().toString().split("_");
+            info[0] = passwordSalt.toString();
+            user.setHashedPassword(hashedPassword);
+            user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
+        }
+        if (minimumSeedDate != null) {
+            String[] info = user.getInfo().toString().split("_");
+            info[1] = minimumSeedDate.toString();
+            user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
+        }
+        if (lastRiskRequestDate != null) {
+            String[] info = user.getInfo().toString().split("_");
+            info[3] = lastRiskRequestDate.toString();
+            user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
+        }
+        String[] info = user.getInfo().toString().split("_");
+        info[2] = isPositive == true ? "true" : "false";
+        info[4] = hadRequestSeed == true ? "true" : "false";
+        user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
+        return user;
     }
 
-    public boolean removeNotification(String code) {
-        return notifications.remove(searchNotification(code));
+    public User updateUser(byte[] hashedCf, byte[] hashedPassword, byte[] passwordSalt, Timestamp lastLoginDate,
+                           Timestamp minimumSeedDate, Timestamp lastRiskRequestDate, boolean isPositive) {
+        User user = findUser(hashedCf);
+        if (user == null) {
+            return null;
+        }
+        if (lastLoginDate != null) {
+            user.setLastLoginDate(lastLoginDate);
+        }
+        if (hashedPassword != null && passwordSalt != null) {
+            String[] info = user.getInfo().toString().split("_");
+            info[0] = passwordSalt.toString();
+            user.setHashedPassword(hashedPassword);
+            user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
+        }
+        if (minimumSeedDate != null) {
+            String[] info = user.getInfo().toString().split("_");
+            info[1] = minimumSeedDate.toString();
+            user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
+        }
+
+        if (lastRiskRequestDate != null) {
+            String[] info = user.getInfo().toString().split("_");
+            info[3] = lastRiskRequestDate.toString();
+            user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
+        }
+        String[] info = user.getInfo().toString().split("_");
+        info[2] = isPositive == true ? "true" : "false";
+        user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
+        return user;
     }
+
+    public User updateUser(byte[] hashedCf, byte[] hashedPassword, byte[] passwordSalt, Timestamp lastLoginDate,
+                           Timestamp minimumSeedDate, boolean hadRequestSeed, Timestamp lastRiskRequestDate) {
+        User user = findUser(hashedCf);
+        if (user == null) {
+            return null;
+        }
+        if (lastLoginDate != null) {
+            user.setLastLoginDate(lastLoginDate);
+        }
+        if (hashedPassword != null && passwordSalt != null) {
+            String[] info = user.getInfo().toString().split("_");
+            info[0] = passwordSalt.toString();
+            user.setHashedPassword(hashedPassword);
+            user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
+        }
+        if (minimumSeedDate != null) {
+            String[] info = user.getInfo().toString().split("_");
+            info[1] = minimumSeedDate.toString();
+            user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
+        }
+        if (lastRiskRequestDate != null) {
+            String[] info = user.getInfo().toString().split("_");
+            info[3] = lastRiskRequestDate.toString();
+            user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
+        }
+        String[] info = user.getInfo().toString().split("_");
+        info[4] = hadRequestSeed == true ? "true" : "false";
+        user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
+        return user;
+    }
+    // END USER
+    // ----------------------------------------------------------------------------------------------------------------
+
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // SWAB
+
+    public boolean createSwab(byte[] swabCode, Timestamp creationDate, boolean isUsed) {
+        Swab s = new Swab(swabCode, creationDate, isUsed);
+        return swabs.putIfAbsent(swabCode, s) == null;
+    }
+
+    public boolean createSwab(byte[] swabCode, boolean isUsed) {
+        Swab s = new Swab(swabCode, ServerUtils.getNow(), isUsed);
+        return swabs.putIfAbsent(swabCode, s) == null;
+    }
+
+    public boolean createSwab(byte[] swabCode) {
+        Swab s = new Swab(swabCode, ServerUtils.getNow(), false);
+        return swabs.putIfAbsent(swabCode, s) == null;
+    }
+
+    public boolean removeSwab(byte[] swabCode) {
+        return swabs.remove(swabCode) != null;
+    }
+
+    public Swab findSwab(byte[] swabCode) {
+        return swabs.get(swabCode);
+    }
+
+    public Swab updateSwab(byte[] swabCode, Timestamp creationDate, boolean isUsed) {
+        Swab s = swabs.get(swabCode);
+        s.setCreationDate(creationDate);
+        s.setUsed(isUsed);
+        return s;
+    }
+
+    public Swab updateSwab(byte[] swabCode, Timestamp creationDate) {
+        Swab s = swabs.get(swabCode);
+        s.setCreationDate(creationDate);
+        return s;
+    }
+
+    // END SWAB
+    // ----------------------------------------------------------------------------------------------------------------
+
+    // CONTACTS
+    // ----------------------------------------------------------------------------------------------------------------
+
+    public boolean createPositiveContact(byte[] seed, Timestamp creationDate, HashMap<byte[], Integer> detectedCodes ){
+        PositiveContact pc = new PositiveContact(seed, creationDate, detectedCodes);
+        return positiveContacts.putIfAbsent(seed, pc) == null;
+    }
+    public boolean createPositiveContact(byte[] seed, HashMap<byte[], Integer> detectedCodes ){
+        PositiveContact pc = new PositiveContact(seed, detectedCodes);
+        return positiveContacts.putIfAbsent(seed, pc) == null;
+    }
+
+    public PositiveContact findPositiveContact(byte[] seed){
+        return positiveContacts.get(seed);
+    }
+
+    public boolean removePositiveContact(byte[] seed){
+        return positiveContacts.remove(seed) != null;
+    }
+
+    public Set<byte[]> getAllPositiveSeeds(){
+        return positiveContacts.keySet();
+    }
+
+    // END CONTACTS
+    // ----------------------------------------------------------------------------------------------------------------
 
 }

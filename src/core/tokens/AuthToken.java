@@ -6,48 +6,68 @@
 package core.tokens;
 
 import exceptions.InvalidTokenFormatException;
+import src.AppServer.ServerRunner;
 import src.AppServer.ServerUtils;
 
+import javax.crypto.*;
+import javax.crypto.spec.SecretKeySpec;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.sql.Time;
 import java.sql.Timestamp;
 
 /**
  * Auth: BASE64(id, data_creazione).HMACSHA256(BASE64(id, data_creazione),
  * sale_2)
- *
  */
 public final class AuthToken extends Token {
 
-    public int getId() {
+    private Cipher cipher = Cipher.getInstance("AES/CRC/PKCS5Padding");
+
+    public byte[] getCfToken(SecretKey keyToken) throws IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
         String[] parts = this.getPayload().split(",");
         if (parts.length != 2) {
             throw new InvalidTokenFormatException("The payload does not contain exactly one comma");
         }
-        return Integer.parseInt(parts[0]);
+        cipher.init(Cipher.DECRYPT_MODE, keyToken);
+        byte[] decodedPayload =  cipher.doFinal(ServerUtils.toByteArray(parts[0]));
+        String[] payloadParts = decodedPayload.toString().split("_");
+        return ServerUtils.toByteArray(payloadParts[0]);
     }
 
-    public Timestamp getCreatedAt() {
+    public Timestamp getCreatedAt(SecretKey keyToken) throws IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
         String[] parts = this.getPayload().split(",");
         if (parts.length != 2) {
             throw new InvalidTokenFormatException("The payload does not contain exactly one comma");
         }
-        return Timestamp.valueOf(parts[1]);
-    }
-    
-    public AuthToken(int id, String salt2) throws NoSuchAlgorithmException, InvalidKeyException {
-        super(id + "," + ServerUtils.getNow(), ServerUtils.toByteArray(salt2));
+        cipher.init(Cipher.DECRYPT_MODE, keyToken);
+        byte[] decodedPayload =  cipher.doFinal(ServerUtils.toByteArray(parts[0]));
+        String[] payloadParts = decodedPayload.toString().split("_");
+        return Timestamp.valueOf(payloadParts[1]);
     }
 
-    public AuthToken(String raw) throws NoSuchAlgorithmException, InvalidKeyException {
+    public AuthToken(byte[] hashedCf, SecretKey keyToken, byte[] saltToken, Timestamp creationDate) throws NoSuchAlgorithmException,
+            InvalidKeyException, IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException {
+        super(AuthToken.getEncryptedToken(hashedCf, keyToken, creationDate).toString(), saltToken);
+    }
+
+    static byte[] getEncryptedToken(byte[] hashedCf, SecretKey keyToken, Timestamp creationDate) throws InvalidKeyException,
+            IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException, NoSuchAlgorithmException {
+        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+        String payloadStr = hashedCf.toString() + "_" + creationDate;
+        cipher.init(Cipher.ENCRYPT_MODE, keyToken);
+        return cipher.doFinal(ServerUtils.toByteArray(payloadStr));
+    }
+
+    public AuthToken(String raw, SecretKey keyToken) throws NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
         super(raw);
-        checkPayloadFormat();
+        checkPayloadFormat(keyToken);
     }
-    
-    private void checkPayloadFormat() {
-        getId();
-        getCreatedAt();
+
+    private void checkPayloadFormat(SecretKey keyToken) throws IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
+        getCfToken(keyToken);
+        getCreatedAt(keyToken);
     }
 
     @Override
@@ -55,13 +75,13 @@ public final class AuthToken extends Token {
         return "AuthToken: " + super.toString();
     }
 
-    public boolean isValid(Timestamp lastLogin, String salt) throws NoSuchAlgorithmException, InvalidKeyException {
-        Timestamp createdAt = this.getCreatedAt();
+    public boolean isValid(Timestamp lastLogin, SecretKey keyToken, String saltToken) throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+        Timestamp createdAt = this.getCreatedAt(keyToken);
         if (!createdAt.equals(lastLogin)) {
             return false;
         }
-        checkPayloadFormat();
-        return this.verifySigma(ServerUtils.toByteArray(salt));
+        checkPayloadFormat(keyToken);
+        return this.verifySigma(ServerUtils.toByteArray(saltToken));
     }
 
 }

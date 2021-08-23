@@ -16,25 +16,23 @@ import core.Request;
 import core.Response;
 import core.SSLServer;
 import core.tokens.*;
-import entities.Contact;
-import entities.ContactReport;
-import entities.User;
-import entities.Notification;
+import entities.*;
 import exceptions.DeletionFailedException;
 import exceptions.InsertFailedException;
 import exceptions.NotFoundException;
 import exceptions.ServerException;
 import exceptions.UpdateException;
+
 import java.io.Serializable;
 
 import utils.*;
 
-import javax.crypto.SecretKey;
+import javax.crypto.*;
 import javax.naming.AuthenticationException;
+import javax.sql.ConnectionPoolDataSource;
 import java.util.stream.Collectors;
 
 /**
- *
  * Endpoints: Login login({codice_fiscale, password}) -> token Registrazione
  * register({codice_fiscale, password}) -> boolean Segnalazione contatto
  * createReport({id2, duration, data}, token) -> boolean Richiesta notifiche
@@ -43,15 +41,51 @@ import java.util.stream.Collectors;
  * codice tampone gratuito getNotificationDetails({code}, token) ->
  * NotificationDetail Tampone con risultato positivo dall’HA
  * notifyPositiveUser({codice_fiscale}) -> boolean
- *
  */
 public class AppServer {
 
-    private String salt1 = "";
-    private String salt2 = "";
+/*    private String salt1 = "";
+    private String salt2 = "";*/
+
+    private byte[] saltCf = new byte[32];
+    private byte[] seedPassword = new byte[32];
+    private byte[] seedToken = new byte[32];
+    private byte[] saltToken = new byte[32];
+    private byte[] saltSwab = new byte[32];
+    /*private byte[] saltPassword;*/
+    private byte[] saltCode = new byte[32];
+
+    private SecretKey keyToken;
+    private SecretKey keyInfo;
+
+    /*private byte[] keySigmaSwab = new byte[32];*/
+    private SecretKey keySwab = new SecretKeySpec(key, "AES");
+    Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+
+
+    /**
+     * GENERATORsalt_pass è un csPRG che usa come seme di generazione “SEEDpassword” per generare i SALTpassword(user).
+     * GENERATORswab è una csPRG che usa come seme di generazione “SEEDswab” per generare i SALTswab.
+     */
+    private SecureRandom saltPasswordGenerator = new SecureRandom(seedPassword);
+    private SecureRandom swabGenerator = new SecureRandom(seedToken);
+
+    /*
+    * SALTcf è una stringa di 256 bit puramente casuale.
+    KEYtoken e KEYinfo sono stringhe di 256 bit puramente casuali.
+    SEEDpassword è una stringa di 256 bit puramente casuale.
+    SEEDswab è una stringa di 256 bit puramente casuale.
+    SALTtoken è una stringa di 256 bit puramente casuale.
+    SALTswab è una stringa pseudo-casuale di 256 bit, relativa a SWAB, generata tramite GENERATORswab.
+    SALTpassword(user) è una stringa pseudo-casuale di 256 bit, relativa a user, generata tramite GENERATORsalt_pass.
+    SALTcode è una stringa di 256 bit puramente casuali.
+    KEYsigma_swab è una stringa di 256 bit puramente casuali
+    * */
+
     private final Database database;
     private final HAApiService healthApiService;
     private final SSLServer publicServer, restrictedServer;
+    private AuthToken token;
 
     public AppServer(String password) throws IOException {
         publicServer = new SSLServer(Config.SERVER_KEYSTORE, Config.SERVER_TRUSTSTORE, password, Config.APP_SERVER_PORT) {
@@ -68,10 +102,24 @@ public class AppServer {
         };
         healthApiService = new HAApiService();
         this.database = new Database();
-        SecretKey key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "salt1");
-        this.salt1 = ServerUtils.toString(key1.getEncoded());
-        SecretKey key2 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "salt2");
-        this.salt2 = ServerUtils.toString(key2.getEncoded());
+
+        SecretKey key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "saltCf");
+        this.saltCf = ServerUtils.toString(key1.getEncoded());
+        key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "keyToken");
+        this.keyToken = ServerUtils.toString(key1.getEncoded());
+        key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "seedPassword");
+        this.seedPassword = ServerUtils.toString(key1.getEncoded());
+        key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "seedToken");
+        this.seedToken = ServerUtils.toString(key1.getEncoded());
+        key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "saltToken");
+        this.saltToken = ServerUtils.toString(key1.getEncoded());
+        key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "saltSwab");
+        this.saltSwab = ServerUtils.toString(key1.getEncoded());
+        key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "saltCode");
+        this.saltCode = ServerUtils.toString(key1.getEncoded());
+        key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "keySwab");
+        this.keySwab = ServerUtils.toString(key1.getEncoded());
+
     }
 
     public void start() {
@@ -123,11 +171,11 @@ public class AppServer {
                 if (token == null) {
                     throw new AuthenticationException("The authentication token is not valid");
                 }
-                Timestamp lastLoginDate = this.database.findUser(token.getId()).getLastLoginDate();
-                if (!token.isValid(lastLoginDate, salt2)) {
+                Timestamp lastLoginDate = this.database.findUser(token.getCfToken(keyToken)).getLastLoginDate();
+                if (!token.isValid(lastLoginDate, keyToken, saltToken.toString())) {
                     throw new AuthenticationException("The authentication token is not valid");
                 }
-                loggedUser = this.database.findUser(token.getId());
+                loggedUser = this.database.findUser(token.getCfToken(keyToken));
                 if (loggedUser == null) {
                     throw new AuthenticationException("User not found");
                 }
@@ -135,6 +183,8 @@ public class AppServer {
 
             Logger.getGlobal().info("the endpoint is " + endpointName);
             Serializable data = "Internal server error";
+            AuthToken token = req.getToken();
+            byte[] hashedCf = token.getCfToken(keyToken);
             switch (endpointName) {
                 case "login":
                     Credentials loginData = (Credentials) req.getPayload();
@@ -144,7 +194,7 @@ public class AppServer {
                     Credentials registerData = (Credentials) req.getPayload();
                     data = this.register(registerData.getCf(), registerData.getPassword());
                     break;
-                case "createReport":
+/*                case "createReport":
                     ContactReportMessage createReportData = (ContactReportMessage) req.getPayload();
                     data = this.createReport(createReportData.getIdUserToReport(), createReportData.getDuration(), createReportData.getStartDate(), loggedUser);
                     break;
@@ -154,6 +204,19 @@ public class AppServer {
                 case "getNotificationSuspensionDate":
                     String code = (String) req.getPayload();
                     data = this.getNotificationSuspensionDate(code, loggedUser);
+                    break;*/
+                case "isPositive":
+                    data = this.isPositive(hashedCf);
+                    break;
+                case 'sendPositiveSeed':
+                    PositiveContact[] codes = (PositiveContact[]) req.getPayload();
+                    data = this.sendPositiveSeed(codes);
+                case "getPositiveSeed":
+                    data = this.getPositiveSeed();
+                    break;
+                case "isAtRisk":
+                    HashMap<byte[], Integer> contactMap = (HashMap<byte[], Integer>) req.getPayload();
+                    data = this.isAtRisk(hashedCf, contactMap);
                     break;
             }
             return Response.make(data);
@@ -166,24 +229,113 @@ public class AppServer {
         }
     }
 
-    public AuthToken login(String cf, String password) throws NoSuchAlgorithmException, InvalidKeyException, AuthenticationException, UpdateException {
+    public AuthToken login(String cf, String password) throws NoSuchAlgorithmException, InvalidKeyException, AuthenticationException, UpdateException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
         byte[] cfBytes = ServerUtils.toByteArray(cf);
-        byte[] hashedCf = encryptCf(cfBytes);
+        byte[] hashedCf = ServerUtils.encryptWithSalt(cfBytes, this.saltCf);
         User user = this.database.findUser(hashedCf);
         if (user == null) {
             throw new AuthenticationException("Invalid credentials");
         }
-        byte[] userSalt = user.getUserSalt();
         byte[] passwordBytes = ServerUtils.toByteArray(password);
-        byte[] hashedPassword = encryptPassword(passwordBytes, userSalt);
+        byte[] saltPassword = new byte[32];
+        saltPasswordGenerator.nextBytes(saltPassword);
+        byte[] hashedPassword = ServerUtils.encryptWithSalt(passwordBytes, saltPassword);
 
         if (Arrays.equals(hashedPassword, user.getHashedPassword())) {
-            int id = user.getId();
-            AuthToken token = new AuthToken(id, salt2);
-            if (this.database.updateUser(user.getHashedCf(), token.getCreatedAt(), null, null) == null) {
+            Timestamp d = ServerUtils.getNow();
+            AuthToken token = new AuthToken(hashedCf, keyToken, saltToken, d);
+            this.database.updateUser(hashedCf, null, null, d, null, null);
+            return token;
+        }
+        return null;
+    }
+
+    public boolean register(String cf, String password) throws NoSuchAlgorithmException, InsertFailedException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
+        if (!healthApiService.checkCf(cf)) {
+            return false;
+        }
+        byte[] cfBytes = cf.getBytes();
+        byte[] passwordBytes = password.getBytes();
+        byte[] passwordSalt = new byte[32];
+        saltPasswordGenerator.nextBytes(passwordSalt);
+
+        byte[] cfHashed = ServerUtils.encryptWithSalt(cfBytes, saltCf);
+        byte[] passwordHashed = ServerUtils.encryptWithSalt(passwordBytes, passwordSalt);
+
+        if (!this.database.addUser(cfHashed, passwordHashed, passwordSalt, keyInfo)) {
+            throw new InsertFailedException("User registration failed");
+        }
+        return true;
+    }
+
+
+    public Set<byte[]> getPositiveSeed() {
+        Set<byte[]> positiveSeed = this.database.getAllPositiveSeeds();
+        return positiveSeed;
+    }
+
+    public boolean isPositive(byte[] cfHashed) throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+        User u = this.database.findUser(cfHashed);
+        cipher.init(Cipher.DECRYPT_MODE, keyInfo);
+        byte[] decodedInfo = cipher.doFinal(u.getInfo());
+        String[] info = decodedInfo.toString().split("_");
+        return info[2] != "false";
+    }
+
+    public boolean sendPositiveSeed(PositiveContact[] pcs) {
+        LinkedList<byte[]> insertedSeeds = new LinkedList<>();
+        for (PositiveContact pc : pcs) {
+            byte[] seed = pc.getSeed();
+            if (!this.database.createPositiveContact(seed, pc.getSeedCreationDate(), pc.getDetectedCodes())) {
+                for (byte[] s : insertedSeeds) {
+                    this.database.removePositiveContact(s);
+                }
+                return false;
+            }
+            insertedSeeds.add(seed);
+        }
+        return true;
+    }
+
+    public String isAtRisk(byte[] hashedCf, HashMap<byte[], Integer> contactMap) throws NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
+        int count = 0;
+        for (byte[] seed : contactMap.keySet()) {
+            if (this.database.findPositiveContact(seed) != null) {
+                count++;
+            }
+        }
+        if (count >= 60) {
+            byte[] swabSalt = new byte[32];
+            swabGenerator.nextBytes(swabSalt);
+            byte[] swabCf = ServerUtils.encryptWithSalt(hashedCf, saltSwab);
+            cipher.init(Cipher.ENCRYPT_MODE, keySwab);
+            byte[] SWAB = cipher.doFinal(swabCf);
+            byte[] hmac = ServerUtils.encryptWithSalt(swabSalt, ServerUtils.encryptWithSalt(swabSalt, swabCf));
+            this.database.createSwab(SWAB, ServerUtils.getNow(), false);
+            return swabCf.toString() + "_" + hmac.toString();
+        }
+        return null;
+    }
+
+/*
+    public AuthToken login(String cf, String password) throws NoSuchAlgorithmException, InvalidKeyException, AuthenticationException, UpdateException {
+        byte[] cfBytes = ServerUtils.toByteArray(cf);
+        byte[] hashedCf = ServerUtils.encryptWithSalt(cfBytes, this.saltCf);
+        User user = this.database.findUser(hashedCf);
+        if (user == null) {
+            throw new AuthenticationException("Invalid credentials");
+        }
+        byte[] passwordBytes = ServerUtils.toByteArray(password);
+        byte[] saltPassword = new byte[32];
+        saltPasswordGenerator.nextBytes(saltPassword);
+        byte[] hashedPassword = encryptPassword(passwordBytes, saltPassword);
+
+        if (Arrays.equals(hashedPassword, user.getHashedPassword())) {
+            //AuthToken token = new AuthToken(user.getHashedCf(), saltToken); FIX ME: cambiare l'implementazione del auth token
+            *//*if (this.database.updateUser(user.getHashedCf(), token.getCreatedAt(), null, null) == null) {
                 throw new UpdateException("User update failed");
             }
-            return token;
+            return token;*//*
         }
         return null;
     }
@@ -192,15 +344,15 @@ public class AppServer {
         if (!healthApiService.checkCf(cf)) {
             return false;
         }
-        byte[] userSalt = new byte[32];
-        new SecureRandom().nextBytes(userSalt);
 
         byte[] passwordBytes = password.getBytes();
-        byte[] hashedPassword = encryptPassword(passwordBytes, userSalt);
+        byte[] passwordSalt = new byte[32]
+        saltPasswordGenerator.nextBytes(passwordSalt);
+        byte[] hashedPassword = encryptPassword(passwordBytes, passwordSalt);
 
         byte[] cfBytes = ServerUtils.toByteArray(cf);
-        byte[] hashedCf = encryptCf(cfBytes);
-        if (!this.database.addUser(hashedCf, hashedPassword, userSalt)) {
+        byte[] hashedCf = ServerUtils.encryptWithSalt(cfBytes, saltCf);
+        if (!this.database.addUser(hashedCf, hashedPassword, passwordSalt)) {
             throw new InsertFailedException("User registration failed");
         }
 
@@ -212,9 +364,37 @@ public class AppServer {
         return ServerUtils.encryptWithSalt(plainPassword, combinedSalt);
     }
 
-    private byte[] encryptCf(byte[] plainCf) throws NoSuchAlgorithmException {
+    private byte[] encryptCf(byte[] plainCf, byte[] salt) throws NoSuchAlgorithmException {
         return ServerUtils.encryptWithSalt(plainCf, ServerUtils.toByteArray(salt1));
-    }
+    }*/
+
+    /*
+     * public Seed[] getPositiveSeed(){
+     *   Seed[] positiveSeed = Database.getPositiveSeed()
+     *   return positiveSeed
+     * }
+     *
+     * public isPositive(byte[] cfHasched, Seed[] seeds){
+     *   int count = 0;
+     *   for (seed in seeds){
+     *       if(Database.searchPositiveRevelance(seed)){
+     *           count ++
+     *       }
+     *   }
+     *   if (count >= 60){
+     *       byte[] swabSalt = new byte[32];
+     *       swabGenerator().nextBytes(swabSalt)
+     *       String swabCf =  ServerUtils.encryptWithSalt(cfHashed, swabSalt).toString();
+     *       cipher.init(Cipher.ENCRYPT_MODE, keySwab);
+     *       String SWAB = cipher.doFinal(ServerUtils.toByteArray(swabCf));
+     *       String hmac = ServerUtils.encryptWithSalt(keySigmaSwab, ServerUtils.encryptWithSalt(keySigmaSwab, swabCode);
+     *       Database.insertSwab(swabCf, ServerUtils.getNow(), false);
+     *       return new Swab(swabCf, hmac);
+     *   }
+     * }
+     *
+     * */
+/*
 
     public boolean createReport(int id, int duration, Timestamp date, User loggedUser) throws NoSuchAlgorithmException, InvalidKeyException, NotFoundException, InsertFailedException, DeletionFailedException {
         Logger.getGlobal().info("CONTATTI NEL DB: " + this.database.contacts.size()+", REPORTS NEL DB:" + this.database.contactReports.size());
@@ -295,6 +475,7 @@ public class AppServer {
 
         return true;
     }
+*/
 
     public LinkedList<String> getNotifications(User loggedUser) throws NoSuchAlgorithmException, InvalidKeyException {
         return this.database
@@ -376,10 +557,10 @@ public class AppServer {
             try {
                 Timestamp expireDate = ServerUtils.getNotificationTokenExpireDays();
                 token = new NotificationToken(u.getId(), expireDate, u.getHashedCf(), salt2);
-                if(!this.database.addNotification(token)) {
+                if (!this.database.addNotification(token)) {
                     throw new InsertFailedException("Failed to add notification");
                 }
-                if(this.database.updateUser(u.getHashedCf(), null, ServerUtils.getNow(), null) == null) {
+                if (this.database.updateUser(u.getHashedCf(), null, ServerUtils.getNow(), null) == null) {
                     throw new UpdateException("Failed to update user");
                 }
             } catch (NoSuchAlgorithmException | InvalidKeyException e) {
