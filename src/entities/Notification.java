@@ -15,7 +15,7 @@ import java.util.Objects;
 
 /**
  */
-public class Notification implements Comparable<Notification> {
+public class Notification {
 
     private final NotificationToken token;
     private Timestamp suspensionDate;
@@ -70,10 +70,5 @@ public class Notification implements Comparable<Notification> {
 
     public void setSuspensionDate(Timestamp suspensionDate) {
         this.suspensionDate = suspensionDate;
-    }
-
-    @Override
-    public int compareTo(Notification n) {
-        return this.getId() - n.getId();
     }
 }

@@ -4,6 +4,8 @@ import core.Response;
 import core.SSLClient;
 import core.tokens.AuthToken;
 import exceptions.RequestFailedException;
+import src.AppClient.CodePair;
+import src.AppClient.Seed;
 import utils.ContactReportMessage;
 import utils.Credentials;
 import entities.Notification;
@@ -11,7 +13,10 @@ import utils.Config;
 
 import java.io.Serializable;
 import java.sql.Timestamp;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 public class ServerApiService extends BaseApiService {
 
@@ -31,12 +36,23 @@ public class ServerApiService extends BaseApiService {
         return (AuthToken) res.getPayload();
     }
 
-    public void reportContact(int id, int duration, Timestamp startDate, AuthToken token) {
-        sendRequest("createReport", new ContactReportMessage(id, duration, startDate), token, "reportContact");
+    public boolean isUserPositive(AuthToken token) {
+        Response res = sendRequest("isUserPositive", null, token, "isUserPositive");
+        return (boolean) res.getPayload();
     }
 
-    public List<Notification> getNotifications(AuthToken token) {
-        Response res = sendRequest("getNotifications", null, token, "getNotifications");
-        return (List<Notification>) res.getPayload();
+    public boolean sendSeedsAndReceivedCodes(HashMap<Seed, List<CodePair>> history, AuthToken token) {
+        Response res = sendRequest("postPositiveData", history, token, "sendSeedsAndReceivedCodes");
+        return (boolean) res.getPayload();
+    }
+
+    public List<Seed> getPositiveSeeds(AuthToken token) {
+        Response res = sendRequest("getPositiveSeeds", null, token, "getPositiveSeeds");
+        return (LinkedList<Seed>) res.getPayload();
+    }
+
+    public boolean reportContacts(LinkedList<Seed> seeds, AuthToken token) {
+        Response res = sendRequest("reportContacts", seeds, token, "reportContacts");
+        return (boolean) res.getPayload();
     }
 }
