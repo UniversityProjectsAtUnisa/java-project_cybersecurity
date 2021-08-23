@@ -128,8 +128,7 @@ public class ServerUtils {
     }
 
     public static Timestamp getNow() {
-        Timestamp instant = Timestamp.from(Instant.now());
-        return instant;
+        return Timestamp.from(Instant.now());
     }
 
     public static Timestamp maxTimestamp(Timestamp t1, Timestamp t2) {

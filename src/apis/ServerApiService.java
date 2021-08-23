@@ -37,12 +37,12 @@ public class ServerApiService extends BaseApiService {
     }
 
     public boolean isUserPositive(AuthToken token) {
-        Response res = sendRequest("isUserPositive", null, token, "isUserPositive");
+        Response res = sendRequest("isPositive", null, token, "isUserPositive");
         return (boolean) res.getPayload();
     }
 
     public boolean sendSeedsAndReceivedCodes(HashMap<Seed, List<CodePair>> history, AuthToken token) {
-        Response res = sendRequest("postPositiveData", history, token, "sendSeedsAndReceivedCodes");
+        Response res = sendRequest("sendPositiveData", history, token, "sendSeedsAndReceivedCodes");
         return (boolean) res.getPayload();
     }
 
@@ -52,7 +52,7 @@ public class ServerApiService extends BaseApiService {
     }
 
     public boolean reportContacts(LinkedList<Seed> seeds, AuthToken token) {
-        Response res = sendRequest("reportContacts", seeds, token, "reportContacts");
+        Response res = sendRequest("isAtRisk", seeds, token, "reportContacts");
         return (boolean) res.getPayload();
     }
 }

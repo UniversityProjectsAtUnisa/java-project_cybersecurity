@@ -1,6 +1,8 @@
 package utils;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+
 
 public class BytesUtils {
     private static ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
@@ -15,5 +17,9 @@ public class BytesUtils {
         System.arraycopy(a, 0, c, 0, a.length);
         System.arraycopy(b, 0, c, a.length, b.length);
         return c;
+    }
+
+    public static String toString(byte[] bytes) {
+        return new String(bytes, StandardCharsets.UTF_8);
     }
 }

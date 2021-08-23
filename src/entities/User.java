@@ -6,13 +6,19 @@
 package entities;
 
 import src.AppServer.ServerUtils;
+import utils.BytesUtils;
 
 import javax.crypto.*;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.Objects;
+import javax.crypto.spec.IvParameterSpec;
 
 /**
  *
@@ -24,13 +30,10 @@ public class User {
     private Timestamp lastLoginDate;
     private byte[] info;
 
-    Cipher cipher = Cipher.getInstance("AES/CRC/PKCS5Padding");
-
     public User(byte[] hashedCf, byte[] hashedPassword, byte[] passwordSalt,
                 Timestamp minimumSeedDate, Timestamp lastRiskRequestDate,
                 boolean hadRequestSeed, boolean isPositive,
-                SecretKey keyInfo) throws InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException,
-            IllegalBlockSizeException, BadPaddingException {
+                SecretKey keyInfo) {
         this.hashedCf = hashedCf;
         this.hashedPassword = hashedPassword;
         this.lastLoginDate = null;
@@ -39,36 +42,61 @@ public class User {
     public User(byte[] hashedCf, byte[] hashedPassword, byte[] passwordSalt,
                 Timestamp lastLoginDate, Timestamp minimumSeedDate, Timestamp lastRiskRequestDate,
                 boolean hadRequestSeed, boolean isPositive,
-                SecretKey keyInfo) throws InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException,
-            IllegalBlockSizeException, BadPaddingException {
+                SecretKey keyInfo) {
         this.hashedCf = hashedCf;
         this.hashedPassword = hashedPassword;
         this.lastLoginDate = lastLoginDate;
         this.info = encryptInfo(passwordSalt, minimumSeedDate, lastRiskRequestDate, hadRequestSeed, isPositive, keyInfo);
     }
 
-    public User(byte[] hashedCf, byte[] hashedPassword, byte[] passwordSalt, SecretKey keyInfo)
-            throws InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException,
-            IllegalBlockSizeException, BadPaddingException {
+    public User(byte[] hashedCf, byte[] hashedPassword, byte[] passwordSalt, SecretKey keyInfo) {
         this.hashedCf = hashedCf;
         this.hashedPassword = hashedPassword;
-        this.lastLoginDate = lastLoginDate;
         this.info = encryptInfo(passwordSalt, null, null, false, false, keyInfo);
     }
 
     private byte[] encryptInfo(byte[] passwordSalt,
                                Timestamp minimumSeedDate, Timestamp lastRiskRequestDate,
                                boolean hadRequestSeed, boolean isPositive,
-                               SecretKey keyInfo) throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+                               SecretKey keyInfo) {
         String info =
-                passwordSalt.toString() + "_" +
-                minimumSeedDate.toString() + "_" +
+                BytesUtils.toString(passwordSalt) + "_" +
+                (minimumSeedDate == null ? -1 : minimumSeedDate.getTime()) + "_" +
                 isPositive + "_" +
-                lastRiskRequestDate.toString() + "_" +
+                (lastRiskRequestDate == null ? -1 : lastRiskRequestDate.getTime()) + "_" +
                 hadRequestSeed;
 
-        cipher.init(Cipher.ENCRYPT_MODE, keyInfo);
-        return cipher.doFinal(ServerUtils.toByteArray(info));
+        try {
+            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            cipher.init(Cipher.ENCRYPT_MODE, keyInfo);
+            return cipher.doFinal(ServerUtils.toByteArray(info));
+        } catch (IllegalBlockSizeException | BadPaddingException | InvalidKeyException | NoSuchPaddingException | NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        throw new RuntimeException("EncryptInfo Failed");
+    }
+
+    public String getDecryptedInfo(SecretKey keyInfo) {
+        try {
+            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            cipher.init(Cipher.DECRYPT_MODE, keyInfo);
+            byte[] data = cipher.doFinal(info);
+            return new String(data, StandardCharsets.UTF_8);
+        } catch (IllegalBlockSizeException | BadPaddingException | InvalidKeyException | NoSuchPaddingException | NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        throw new RuntimeException("Decrypt Info Failed");
+    }
+
+    public void setEncryptInfo(String info, SecretKey keyInfo) {
+        try {
+            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            cipher.init(Cipher.ENCRYPT_MODE, keyInfo);
+            this.info = cipher.doFinal(ServerUtils.toByteArray(info));
+        } catch (IllegalBlockSizeException | BadPaddingException | InvalidKeyException | NoSuchPaddingException | NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        throw new RuntimeException("EncryptInfo Failed");
     }
 
     public byte[] getHashedCf() {
@@ -77,10 +105,6 @@ public class User {
 
     public byte[] getHashedPassword() {
         return hashedPassword;
-    }
-
-    public void setHashedPassword(byte[] hashedPassword) {
-        this.hashedPassword = hashedPassword;
     }
 
     public Timestamp getLastLoginDate() {
@@ -108,12 +132,11 @@ public class User {
             return false;
         }
         User user = (User) o;
-        return hashedCf == user.getHashedCf();
+        return Arrays.equals(hashedCf, user.getHashedCf());
     }
 
     @Override
     public int hashCode() {
         return Arrays.hashCode(hashedCf);
     }
-
 }

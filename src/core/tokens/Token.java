@@ -17,6 +17,8 @@ import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 import exceptions.InvalidTokenFormatException;
 import exceptions.InvalidTokenSigmaException;
+import utils.BytesUtils;
+
 import java.util.Objects;
 
 /**
@@ -42,7 +44,7 @@ public abstract class Token implements Serializable, Comparable<Token> {
         hMac.init(hMacKey);
         hMac.update(bytePayload);
         byte[] hMacRes = hMac.doFinal();
-        return ServerUtils.toString(hMacRes);
+        return BytesUtils.toString(hMacRes);
     }
 
     public Token(String raw) {

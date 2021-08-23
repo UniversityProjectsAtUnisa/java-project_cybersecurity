@@ -95,7 +95,7 @@ public class AppClient {
             storage.saveIntervalData(seed, currentIntervalReceivedCodes);
         // CREATE NEW SEED AND NEW BUCKET FOR RECEIVED CODES
         try {
-            byte[] seedGen = new byte[256];
+            byte[] seedGen = new byte[32];
             SecureRandom r = SecureRandom.getInstanceStrong();
             r.nextBytes(seedGen);
             seed = new Seed(intervalStart, seedGen);

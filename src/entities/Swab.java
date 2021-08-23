@@ -7,7 +7,7 @@ import java.sql.Timestamp;
 public class Swab {
 
     private byte[] swabCode;
-    private Timestamp creationDate;
+    private final Timestamp creationDate;
     private boolean isUsed;
 
     public Swab(byte[] swabCode, Timestamp creationDate, boolean isUsed) {
@@ -26,16 +26,8 @@ public class Swab {
         return swabCode;
     }
 
-    public void setSwabCode(byte[] swabCode) {
-        this.swabCode = swabCode;
-    }
-
     public Timestamp getCreationDate() {
         return creationDate;
-    }
-
-    public void setCreationDate(Timestamp creationDate) {
-        this.creationDate = creationDate;
     }
 
     public boolean isUsed() {
