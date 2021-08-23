@@ -1,11 +1,10 @@
 package utils;
 
 import src.AppClient.AppClient;
+import src.AppClient.BluetoothModule;
 
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.security.NoSuchAlgorithmException;
+import java.util.*;
 import java.util.logging.Logger;
 
 public class AppTimer {
@@ -36,8 +35,21 @@ public class AppTimer {
 
     private void onTimeout() {
         Logger.getGlobal().info("GlobalTimer Timeout");
-        for (AppClient appClient: clients) {
-            appClient.scanAndEmit();
+        long instant = new Date().getTime() / Config.TC;
+
+        if ((instant % (Config.TSEME / Config.TC)) == 0) {
+            clients.forEach(appClient -> appClient.startNewInterval(instant));
         }
+
+        clients.forEach(appClient -> {
+            try {
+                appClient.emit(instant);
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
+            }
+        });
+        BluetoothModule.populateRandomUserMap();  // FOR SIMULATION
+        clients.forEach(appClient -> appClient.scan(instant));
+        BluetoothModule.clearSimulationData();    // FOR SIMULATION
     }
 }

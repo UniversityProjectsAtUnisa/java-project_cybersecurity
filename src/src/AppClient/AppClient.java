@@ -2,38 +2,38 @@ package src.AppClient;
 
 import apis.ServerApiService;
 import core.tokens.AuthToken;
+import utils.BytesUtils;
 import utils.Credentials;
-import entities.Notification;
-import java.sql.Timestamp;
+
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import utils.AppTimer;
 import utils.Config;
 import java.util.*;
-import java.util.logging.Logger;
-import src.AppServer.ServerUtils;
 
 public class AppClient {
-    private static final double MAX_DISTANCE = 2.0;
-
-    private static class ContactCounter {
-        private int count = 1;
-        private final Timestamp startDate;
-
-        public ContactCounter() {
-            startDate = ServerUtils.getNow();
-        }
-
-        public void increment() {
-            count++;
-        }
+    public enum AppClientState {
+        NOT_LOGGED,
+        LOGGED
     }
 
+    private static final double MAX_DISTANCE = 4.0;
+
+    private final ServerApiService serverApi = new ServerApiService();
+    private final LocalStorage storage = new LocalStorage();
     private AppClientState appState = AppClientState.NOT_LOGGED;
     private final BluetoothModule ble = new BluetoothModule();
-    private final Map<Integer, ContactCounter> userCounter = new HashMap<>();
-    private final ServerApiService serverApi = new ServerApiService();
+    private Seed seed;
+    private List<CodePair> currentIntervalReceivedCodes;
     private AuthToken token;
-    private final Timer notificationTimer = new Timer();
     private Credentials tmpCredentials;
+
+    public AppClient() {
+        AppTimer.getInstance().subscribe(this);
+        long instant = new Date().getTime() / Config.TC;
+        startNewInterval(instant);
+    }
 
     private Credentials getTmpCredentials() {
         if (tmpCredentials == null) tmpCredentials = FakeInput.getNextCredential();
@@ -46,75 +46,101 @@ public class AppClient {
 
     public boolean login() {
         token = serverApi.login(getTmpCredentials());
-        
         if (token == null)
             return false;
         appState = AppClientState.LOGGED;
-        AppTimer.getInstance().subscribe(this);
-        startNotificationTimer();
         return true;
     }
 
-    private void startNotificationTimer() {
-        TimerTask task = new TimerTask() {
-            public void run() {
-                fetchNotifications();
-            }
-        };
-        long firstDelay = (long) ((Math.random() * (36 - 12)) + 12);
-        long period = 24L;
-        // small values just for the simulation
-        notificationTimer.schedule(task, firstDelay * 1000L, period * 1000L);
-    }
-
-    public void fetchNotifications() {
-        if (appState != AppClientState.LOGGED) throw new RuntimeException();
-        List<Notification> notifications = serverApi.getNotifications(token);
-        String log = String.format("User(%d) has %d notifications", token.getId(), notifications.size());
-        Logger.getGlobal().info(log);
-    }
-
-    public void scanAndEmit() {
-        if (appState != AppClientState.LOGGED) throw new RuntimeException();
-        ble.emit(); // non blocking
-        BluetoothScan[] scanResult = ble.scan(token.getId());
-        Set<BluetoothScan> filteredResult = new HashSet<>();  // remove duplicates and distant scans
-        Collections.addAll(
-            filteredResult,
-            Arrays.stream(scanResult).filter((item) -> item.getDistance() < MAX_DISTANCE).toArray(BluetoothScan[]::new)
-        );
-        filteredResult.forEach(this::evaluateScan);
-        evaluateContactEnded(filteredResult);
-    }
-
-    private void evaluateScan(BluetoothScan scan) {
-        int id = scan.getId();
-        if (userCounter.containsKey(id)) {
-            ContactCounter cc = userCounter.get(id);
-            cc.increment();
-            if (cc.count >= Config.N_CUM) {  // limit reached
-                terminateContact(id);
-            }
-        } else {
-            userCounter.put(id, new ContactCounter());
+    public void isUserPositive() {
+        if (appState != AppClientState.LOGGED)
+            throw new RuntimeException("User must be logged request: isUserPositive");
+        // ASK SERVER IF USER IS POSITIVE
+        boolean res = serverApi.isUserPositive(token);
+        // SEND SEEDS, RECEIVED CODES WITH INSTANTS
+        if (res) {
+            HashMap<Seed, List<CodePair>> data = new HashMap<>();
+            Map<Long, List<CodePair>> contactHistory = storage.getContactHistoryCopy();
+            Map<Long, Seed> seedHistory = storage.getSeedHistoryCopy();
+            seedHistory.keySet().forEach(l -> data.put(seedHistory.get(l), contactHistory.get(l)));
+            serverApi.sendSeedsAndReceivedCodes(data, token);
         }
     }
 
-    private void evaluateContactEnded(Set<BluetoothScan> scanResult) {
-        Set<Integer> currentIds = new HashSet<>(userCounter.keySet());
-
-        Set<Integer> scannedIds = new HashSet<>();
-        for (BluetoothScan scan: scanResult) {
-            scannedIds.add(scan.getId());
+    public void isUserAtRisk() throws NoSuchAlgorithmException {
+        if (appState != AppClientState.LOGGED)
+            throw new RuntimeException("User must be logged request: isUserAtRisk");
+        // RETRIEVE FROM SERVER SEEDS OF POSITIVE USERS
+        List<Seed> positiveSeeds = serverApi.getPositiveSeeds(token);
+        // COMPUTE IF USER IS AT RISK
+        LinkedList<Seed> pairs = findContactPairs(positiveSeeds);
+        // SEND TO SERVER ALL PAIR FOUND
+        if (pairs.size() * Config.TC >= 15 * 60 * 1000) {  // 15 * 60 * 1000 are millis in 15 minutes
+            serverApi.reportContacts(pairs, token);
         }
-
-        currentIds.removeAll(scannedIds);
-        currentIds.forEach(this::terminateContact);
     }
 
-    private void terminateContact(int id) {
-        ContactCounter contactCounter = userCounter.remove(id);
-        System.out.printf("By client %d, ReportContact(id=%d, count=%d, startDate=%s)%n", token.getId(), id, contactCounter.count, contactCounter.startDate);
-        serverApi.reportContact(id, contactCounter.count * Config.TC, contactCounter.startDate, token);
+    public void startNewInterval(long intervalStart) {
+        if (seed != null)
+            storage.saveIntervalData(seed, currentIntervalReceivedCodes);
+        // CREATE NEW SEED AND NEW BUCKET FOR RECEIVED CODES
+        try {
+            byte[] seedGen = new byte[256];
+            SecureRandom r = SecureRandom.getInstanceStrong();
+            r.nextBytes(seedGen);
+            seed = new Seed(intervalStart, seedGen);
+            currentIntervalReceivedCodes = new LinkedList<>();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+    }
+
+    public void emit(long instant) throws NoSuchAlgorithmException {
+        byte[] code = generateCode(seed.getValue(), instant);
+        ble.emit(code);
+    }
+
+    public void scan(long instant) {
+        BluetoothScan[] scanResult = ble.scan();
+        Arrays.stream(scanResult)
+                .filter((item) -> item.getDistance() < MAX_DISTANCE)
+                .map(BluetoothScan::getCode)
+                .forEach((code) -> {
+                    CodePair pair = new CodePair(code, instant);
+                    currentIntervalReceivedCodes.add(pair);
+                });
+    }
+
+    private LinkedList<Seed> findContactPairs(List<Seed> positiveSeeds) throws NoSuchAlgorithmException {
+        int tcInInterval = Config.TSEME / Config.TC;
+        Set<Seed> contactPairs = new HashSet<>();
+        Map<Long, List<CodePair>> contactHistory = storage.getContactHistoryCopy();
+        Map<Long, Seed> seedHistory = storage.getSeedHistoryCopy();
+
+        for (Seed positiveSeed: positiveSeeds) {
+            long genDate = positiveSeed.getGenDate();
+            byte[] userSeed = seedHistory.get(genDate).getValue();
+            List<CodePair> codes = contactHistory.get(genDate);
+            // FOR EACH INSTANT IN THE INTERVAL
+            for (int i=0; i < tcInInterval; i++) {
+                long instant = genDate + i * Config.TC;
+                byte[] positiveCode = generateCode(positiveSeed.getValue(), instant);
+                // SEARCH: CODE_POSITIVE == CODE_RECEIVED AND INSTANT_POSITIVE == INSTANT_RECEIVED
+                for (CodePair receivedCode: codes) {
+                    if (receivedCode.getInstant() == instant && Arrays.equals(receivedCode.getCode(), positiveCode)) {
+                        contactPairs.add(new Seed(instant, userSeed));
+                        break;
+                    }
+                }
+            }
+        }
+
+        return new LinkedList<>(contactPairs);
+    }
+
+    private byte[] generateCode(byte[] seedValue, long instant) throws NoSuchAlgorithmException {
+        byte[] concatenation = BytesUtils.concat(seedValue, BytesUtils.fromLong(instant));
+        return MessageDigest.getInstance("SHA-256").digest(concatenation);
     }
 }
