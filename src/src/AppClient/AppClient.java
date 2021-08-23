@@ -52,9 +52,19 @@ public class AppClient {
         return true;
     }
 
-    public void isUserPositive() {
-        if (appState != AppClientState.LOGGED)
-            throw new RuntimeException("User must be logged request: isUserPositive");
+    public void intervalRoutine() {
+        boolean isPositive = isUserPositive();
+        if (!isPositive) {
+            try {
+                isUserAtRisk();
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public boolean isUserPositive() {
+        if (appState != AppClientState.LOGGED) login();
         // ASK SERVER IF USER IS POSITIVE
         boolean res = serverApi.isUserPositive(token);
         // SEND SEEDS, RECEIVED CODES WITH INSTANTS
@@ -63,13 +73,13 @@ public class AppClient {
             Map<Long, List<CodePair>> contactHistory = storage.getContactHistoryCopy();
             Map<Long, Seed> seedHistory = storage.getSeedHistoryCopy();
             seedHistory.keySet().forEach(l -> data.put(seedHistory.get(l), contactHistory.get(l)));
-            serverApi.sendSeedsAndReceivedCodes(data, token);
+            return serverApi.sendSeedsAndReceivedCodes(data, token);
         }
+        return false;
     }
 
     public void isUserAtRisk() throws NoSuchAlgorithmException {
-        if (appState != AppClientState.LOGGED)
-            throw new RuntimeException("User must be logged request: isUserAtRisk");
+        if (appState != AppClientState.LOGGED) login();
         // RETRIEVE FROM SERVER SEEDS OF POSITIVE USERS
         List<Seed> positiveSeeds = serverApi.getPositiveSeeds(token);
         // COMPUTE IF USER IS AT RISK
@@ -90,6 +100,7 @@ public class AppClient {
             r.nextBytes(seedGen);
             seed = new Seed(intervalStart, seedGen);
             currentIntervalReceivedCodes = new LinkedList<>();
+            storage.printHistory();
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
             System.exit(1);
@@ -113,7 +124,7 @@ public class AppClient {
     }
 
     private LinkedList<Seed> findContactPairs(List<Seed> positiveSeeds) throws NoSuchAlgorithmException {
-        int tcInInterval = Config.TSEME / Config.TC;
+        int tcCountInInterval = Config.TSEME / Config.TC;
         Set<Seed> contactPairs = new HashSet<>();
         Map<Long, List<CodePair>> contactHistory = storage.getContactHistoryCopy();
         Map<Long, Seed> seedHistory = storage.getSeedHistoryCopy();
@@ -123,7 +134,7 @@ public class AppClient {
             byte[] userSeed = seedHistory.get(genDate).getValue();
             List<CodePair> codes = contactHistory.get(genDate);
             // FOR EACH INSTANT IN THE INTERVAL
-            for (int i=0; i < tcInInterval; i++) {
+            for (int i=0; i < tcCountInInterval; i++) {
                 long instant = genDate + i * Config.TC;
                 byte[] positiveCode = generateCode(positiveSeed.getValue(), instant);
                 // SEARCH: CODE_POSITIVE == CODE_RECEIVED AND INSTANT_POSITIVE == INSTANT_RECEIVED

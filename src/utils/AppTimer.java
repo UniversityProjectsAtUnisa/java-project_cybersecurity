@@ -37,8 +37,11 @@ public class AppTimer {
         Logger.getGlobal().info("GlobalTimer Timeout");
         long instant = new Date().getTime() / Config.TC;
 
-        if ((instant % (Config.TSEME / Config.TC)) == 0) {
+        long n = instant % (Config.TSEME / Config.TC);
+        if (n == 0) {
             clients.forEach(appClient -> appClient.startNewInterval(instant));
+        } else if (n == Config.TSEME / Config.TC -1) {
+            clients.forEach(AppClient::intervalRoutine);
         }
 
         clients.forEach(appClient -> {

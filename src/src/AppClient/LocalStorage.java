@@ -10,7 +10,6 @@ public class LocalStorage {
     public void saveIntervalData(Seed seed, List<CodePair> receivedCodes) {
         seedHistory.put(seed.getGenDate(), seed);
         contactHistory.put(seed.getGenDate(), receivedCodes);
-        printHistory();
     }
 
     public HashMap<Long, List<CodePair>> getContactHistoryCopy() {
