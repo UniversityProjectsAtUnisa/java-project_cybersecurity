@@ -46,9 +46,7 @@ public class AppClient {
     }
 
     public boolean login() {
-        Credentials temp = getTmpCredentials();
-        System.out.println(temp);
-        token = serverApi.login(temp);
+        token = serverApi.login(getTmpCredentials());
         if (token == null)
             return false;
         appState = AppClientState.LOGGED;
@@ -92,8 +90,8 @@ public class AppClient {
             LinkedList<Seed> pairs = findContactPairs(positiveSeeds);
             // SEND TO SERVER ALL PAIR FOUND
             if (pairs.size() * Config.TC >= 15 * 60 * 1000) {  // 15 * 60 * 1000 are millis in 15 minutes
-                boolean res = serverApi.reportContacts(pairs, token);
-                if (res) storage.clear();
+                byte[] notification = serverApi.reportContacts(pairs, token);  // TODO: USE NOTIFICATION IN SOME WAY
+                if (notification != null) storage.clear();
             }
         }
     }

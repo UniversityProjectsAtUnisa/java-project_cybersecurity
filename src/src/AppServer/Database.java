@@ -1,31 +1,14 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package src.AppServer;
 
-import core.tokens.NotificationToken;
 import entities.*;
 import src.AppClient.CodePair;
 import src.AppClient.Seed;
 import utils.BytesUtils;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.*;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
-/**
- *
- */
 public class Database {
 
     private HashMap<String, User> users = new HashMap<>();

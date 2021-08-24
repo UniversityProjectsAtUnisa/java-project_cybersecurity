@@ -2,6 +2,7 @@ package src.AppClient;
 
 import utils.AppTimer;
 import utils.Config;
+import utils.SimulationData;
 
 import java.util.logging.Logger;
 

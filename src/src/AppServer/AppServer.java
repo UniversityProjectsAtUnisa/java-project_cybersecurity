@@ -37,34 +37,32 @@ import javax.naming.AuthenticationException;
  */
 public class AppServer {
 
-    /*    private String salt1 = "";
-    private String salt2 = "";*/
-    private byte[] saltCf = new byte[32];
-    private byte[] seedPassword = new byte[32];
-    private byte[] seedToken = new byte[32];
-    private byte[] saltToken = new byte[32];
-    private SecretKey keySigmaSwab;
-    /*private byte[] saltPassword;*/
-    private byte[] saltCode = new byte[32];
+    private static final String KEY_STORE = "./salts_keystore.jks";
+    private static final String PASSWORD = "changeit";
 
-    private SecretKey keyToken;
-    private SecretKey keyInfo;
+    private final byte[] saltCf;
+    private final byte[] seedPassword;
+    private final byte[] seedToken;
+    private final byte[] saltToken;
+    private final byte[] saltCode;
 
-    /*private byte[] keySigmaSwab = new byte[32];*/
-    private SecretKey keySwab;
-    Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+    private final SecretKey keyToken;
+    private final SecretKey keyInfo;
+
+    private final SecretKey keySigmaSwab;
+    private final SecretKey keySwab;
+
+    private final Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");  // FIXME: CHANGE ECB TO CBC
 
     /**
-     * GENERATORsalt_pass è un csPRG che usa come seme di generazione
-     * “SEEDpassword” per generare i SALTpassword(user). GENERATORswab è una
-     * csPRG che usa come seme di generazione “SEEDswab” per generare i
-     * SALTswab.
+     * saltPasswordGenerator is a csPRG that uses: seedPassword
+     * swabGenerator is a csPRG that uses: seedToken
      */
-    private SecureRandom saltPasswordGenerator = new SecureRandom(seedPassword);
-    private SecureRandom swabGenerator = new SecureRandom(seedToken);
+    private SecureRandom saltPasswordGenerator;
+    private SecureRandom swabGenerator;
 
     /*
-    * SALTcf è una stringa di 256 bit puramente casuale.
+    SALTcf è una stringa di 256 bit puramente casuale.
     KEYtoken e KEYinfo sono stringhe di 256 bit puramente casuali.
     SEEDpassword è una stringa di 256 bit puramente casuale.
     SEEDswab è una stringa di 256 bit puramente casuale.
@@ -73,11 +71,10 @@ public class AppServer {
     SALTpassword(user) è una stringa pseudo-casuale di 256 bit, relativa a user, generata tramite GENERATORsalt_pass.
     SALTcode è una stringa di 256 bit puramente casuali.
     KEYsigma_swab è una stringa di 256 bit puramente casuali
-    * */
+    */
     private final Database database;
     private final HAApiService healthApiService;
     private final SSLServer publicServer, restrictedServer;
-    private AuthToken token;
 
     public AppServer(String password) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
         publicServer = new SSLServer(Config.SERVER_KEYSTORE, Config.SERVER_TRUSTSTORE, password, Config.APP_SERVER_PORT) {
@@ -94,26 +91,29 @@ public class AppServer {
         };
         healthApiService = new HAApiService();
         this.database = new Database();
-
-        SecretKey key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "saltCf");
+        // KEYS AND SALTS INIT
+        SecretKey key1 = ServerUtils.loadFromKeyStore(KEY_STORE, PASSWORD, "saltCf");
         this.saltCf = key1.getEncoded();
-        key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "seedPassword");
+        key1 = ServerUtils.loadFromKeyStore(KEY_STORE, PASSWORD, "seedPassword");
         this.seedPassword = key1.getEncoded();
-        key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "seedToken");
+        key1 = ServerUtils.loadFromKeyStore(KEY_STORE, PASSWORD, "seedToken");
         this.seedToken = key1.getEncoded();
-        key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "saltToken");
+        key1 = ServerUtils.loadFromKeyStore(KEY_STORE, PASSWORD, "saltToken");
         this.saltToken = key1.getEncoded();
-        key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "saltSwab");
+        key1 = ServerUtils.loadFromKeyStore(KEY_STORE, PASSWORD, "saltSwab");
         this.keySigmaSwab = new SecretKeySpec(key1.getEncoded(), 0, key1.getEncoded().length, "AES");
-        key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "saltCode");
+        key1 = ServerUtils.loadFromKeyStore(KEY_STORE, PASSWORD, "saltCode");
         this.saltCode = key1.getEncoded();
 
-        key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "keyToken");
+        key1 = ServerUtils.loadFromKeyStore(KEY_STORE, PASSWORD, "keyToken");
         this.keyToken = new SecretKeySpec(key1.getEncoded(), 0, key1.getEncoded().length, "AES");
-        key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "keySwab");
+        key1 = ServerUtils.loadFromKeyStore(KEY_STORE, PASSWORD, "keySwab");
         this.keySwab = new SecretKeySpec(key1.getEncoded(), 0, key1.getEncoded().length, "AES");
-        key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "keyInfo");
+        key1 = ServerUtils.loadFromKeyStore(KEY_STORE, PASSWORD, "keyInfo");
         this.keyInfo = new SecretKeySpec(key1.getEncoded(), 0, key1.getEncoded().length, "AES");
+        // GENERATORS INIT
+        saltPasswordGenerator = new SecureRandom(seedPassword);
+        swabGenerator = new SecureRandom(seedToken);
     }
 
     public void start() {
@@ -140,28 +140,15 @@ public class AppServer {
         } catch (Exception e) {
             Logger.getGlobal().warning(endpointName + ' ' + e.getMessage());
             return Response.error("Internal server error");
-//        }
-//            String cf = (String) req.getPayload();
-//            boolean success = notifyPositiveUser(cf);
-//            return Response.make(success);
-//        } catch (Exception e) {
-//            Logger.getGlobal().warning("Server Internal Error: " + e.getMessage());
-//            return Response.error("Server Internal Error");
-//        }
         }
     }
 
     public synchronized Response publicHandleRequest(Request req) {
-        // UseNotification è chiamato dall'HA
-        // TUtte le chiamate sono autenticate tranne login e register
-        // Nel server dell'HA c'è notifyPositiveUser e useNotification
-        // Nomi endpoint tutti maiuscoli
-        // Sistema verify di notificationToken (useNotification): il cf a disposizione è hashato
-
         String endpointName = req.getEndpointName();
         User loggedUser = null;
         try {
-            if (!endpointName.equals("login") && !endpointName.equals("register")) {
+            // All request are authenticated except login and register
+            if (!endpointName.equals("LOGIN") && !endpointName.equals("REGISTER")) {
                 AuthToken token = req.getToken();
                 if (token == null) {
                     throw new AuthenticationException("The authentication token is not valid");
@@ -175,32 +162,30 @@ public class AppServer {
                     throw new AuthenticationException("The authentication token is not valid");
                 }
             }
-            AuthToken token;
-            byte[] hashedCf;
             Logger.getGlobal().info("the endpoint is " + endpointName);
             Serializable data = "Internal server error";
             switch (endpointName) {
-                case "login":
+                case "LOGIN":
                     Credentials loginData = (Credentials) req.getPayload();
                     data = this.login(loginData.getCf(), loginData.getPassword());
                     break;
-                case "register":
+                case "REGISTER":
                     Credentials registerData = (Credentials) req.getPayload();
                     data = this.register(registerData.getCf(), registerData.getPassword());
                     break;
-                case "isPositive":
+                case "IS_POSITIVE":
                     data = isPositive(loggedUser);
                     break;
-                case "sendPositiveData":
+                case "SEND_POSITIVE_DATA":
                     List<PositiveContact> codes = (LinkedList<PositiveContact>) req.getPayload();
-                    data = this.sendPositiveSeed(loggedUser, codes);
+                    data = sendPositiveSeed(loggedUser, codes);
                     break;
-                case "getPositiveSeeds":
-                    data = this.getPositiveSeed(loggedUser);
+                case "GET_POSITIVE_SEEDS":
+                    data = getPositiveSeed(loggedUser);
                     break;
-                case "isAtRisk":
+                case "IS_AT_RISK":
                     List<Seed> userSeeds = (LinkedList<Seed>) req.getPayload();
-                    data = this.isAtRisk(loggedUser, userSeeds);
+                    data = isAtRisk(loggedUser, userSeeds);
                     break;
             }
             return Response.make(data);
@@ -235,7 +220,7 @@ public class AppServer {
         return null;
     }
 
-    public boolean register(String cf, String password) throws NoSuchAlgorithmException, InsertFailedException {
+    public boolean register(String cf, String password) throws InsertFailedException {
         if (!healthApiService.checkCf(cf)) {
             return false;
         }
@@ -276,7 +261,7 @@ public class AppServer {
 
     // FASE 4
     public LinkedList<Seed> getPositiveSeed(User user) {
-        // CHECK: lastRiskRequestDate, hadRequestSeed=false
+        // CHECK: lastRiskRequestDate not in current interval, hadRequestSeed=false
         if (user.getHadRequestSeed(keyInfo))
             return null;
         else if (isDateInCurrentInterval(user.getLastRiskRequestDate(keyInfo)))
@@ -296,52 +281,79 @@ public class AppServer {
         return new LinkedList<>(filtered);
     }
 
-    public String isAtRisk(User user, List<Seed> userSeeds) throws IllegalBlockSizeException, BadPaddingException, InvalidKeyException, NoSuchAlgorithmException {
-        // Encrypt every code pairs in the ContactMap
+    public byte[] isAtRisk(User user, List<Seed> userSeeds) throws IllegalBlockSizeException, BadPaddingException, InvalidKeyException, NoSuchAlgorithmException {
+        // CHECK: lastRiskRequestDate in current interval, hadRequestSeed=true
+        if (!user.getHadRequestSeed(keyInfo))
+            return null;
+        else if (!isDateInCurrentInterval(user.getLastRiskRequestDate(keyInfo)))
+            return null;
+        // UPDATE USER: hadRequestSeed=false
+        database.updateUser(user.getHashedCf(), null, null, false, null, keyInfo);
+        // Compute valid contact reports
         int n = countValidContactReports(userSeeds);
-        // If user is at risk: n * Tc > millis(15)
+        // if user is at risk: n * Tc > millis(15)
         if (n * Config.TC > 15 * 60 * 1000) {
-
+            // GENERATE SWAB SALT
             byte[] swabSalt = new byte[32];
             swabGenerator.nextBytes(swabSalt);
-
+            // GENERATE AND SAVE ENCRYPTED SWAB
             byte[] swabCf = BytesUtils.concat(user.getHashedCf(), swabSalt);
             cipher.init(Cipher.ENCRYPT_MODE, keySwab);
             byte[] encryptedSwab = cipher.doFinal(swabCf);
-
-            Mac hMac = Mac.getInstance("HMacSHA256");
-            hMac.init(keySigmaSwab);
-            hMac.update(encryptedSwab);
-            byte[] hmac = hMac.doFinal();
-            // byte[] hmac = ServerUtils.encryptWithSalt(saltSwab, ServerUtils.encryptWithSalt(saltSwab, swabCf));
-
             database.createSwab(encryptedSwab, ServerUtils.getNow());
-
-            return BytesUtils.toString(encryptedSwab) + "_" + BytesUtils.toString(hmac);  // FIXME: SOSPETTO
+            // GENERATE SWAB SIGMA
+            byte[] hmac = computeSwabSigma(encryptedSwab);
+            // UPDATE USER: set minimum_seed_date to current time
+            database.updateUser(user, null, ServerUtils.getNow(), null, keyInfo);
+            return BytesUtils.concat(encryptedSwab, hmac);
         }
-
-        // database.updateUser();
-
         return null;
     }
 
     // HA REQUESTS
-    public boolean useNotification(String swab, String cf) {
-        // Verificare che il codice esista
-        // Verificare che la persona a cui è assegnato è cf
-        // Verificare che sigma sia valido
+    public boolean useNotification(byte[] fullSwab, String cf) throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+        // CHECK SWAB SIGMA
+        int splitPoint = fullSwab.length - 32;  // 32 is the length of hmac sigma
+        byte[] encryptedSWAB = Arrays.copyOfRange(fullSwab, 0, splitPoint);
+        byte[] userHmac = Arrays.copyOfRange(fullSwab, splitPoint, fullSwab.length);
+        byte[] newHmac = computeSwabSigma(encryptedSWAB);
+        if (ServerUtils.secureByteCompare(userHmac, newHmac))
+            return false;
 
-        String[] swabParts = swab.split("_");
-        byte[] encryptedSWAB = swabParts[0].getBytes();
-        byte[] hmac = swabParts[1].getBytes();
-
+        Swab dbSwab = database.findSwab(encryptedSWAB);
+        // CHECK IF SWAB CODE IS IN THE DATABASE
+        if (dbSwab == null)
+            return false;
+        // CHECK: SWAB.IS_USED=FALSE
+        if (dbSwab.isUsed())
+            return false;
+        if (ServerUtils.getNow().getTime() - dbSwab.getCreationDate().getTime() != Config.SWAB_DATE_OFFSET)  // FIXME: troppo restrittivo
+            return false;
+        // UPDATE DATABASE: set swab.is_used to true
+        database.updateSwab(encryptedSWAB, true);
+        // CHECK: CF
+        cipher.init(Cipher.DECRYPT_MODE, keySwab);
+        byte[] decryptedSwab = cipher.doFinal(encryptedSWAB);
+        byte[] hashedCf = Arrays.copyOfRange(decryptedSwab, 0, decryptedSwab.length - 32);
+        if (!Arrays.equals(ServerUtils.encryptWithSalt(cf.getBytes(), saltCf), hashedCf))
+            return false;
+        // UPDATE USER: set minimum_seed_date to current time
+        database.updateUser(hashedCf, null, ServerUtils.getNow(), null, keyInfo);
         return true;
     }
 
     public boolean notifyPositiveUser(String cf) {
+        byte[] hashedCf = ServerUtils.encryptWithSalt(cf.getBytes(), saltCf);
+        User user = database.findUser(hashedCf);
+        if (user != null) {
+            database.updateUser(hashedCf, null, ServerUtils.getNow(), null, keyInfo);
+        } else {
+            Logger.getGlobal().warning("404: USER NOT FOUND -> notifyPositiveUser");
+        }
         return true;
     }
 
+    // UTILITY METHODS
     private List<CodePair> encryptCodePairs(List<CodePair> plainCodePairs) {
         return plainCodePairs
                 .stream()
@@ -397,5 +409,12 @@ public class AppServer {
             e.printStackTrace();
         }
         throw new RuntimeException("NoSuchAlgorithmException(SHA-256) in AppServer(generateCode)");
+    }
+
+    private byte[] computeSwabSigma(byte[] payload) throws NoSuchAlgorithmException, InvalidKeyException {
+        Mac hMac = Mac.getInstance("HMacSHA256");
+        hMac.init(keySigmaSwab);
+        hMac.update(payload);
+        return hMac.doFinal();
     }
 }

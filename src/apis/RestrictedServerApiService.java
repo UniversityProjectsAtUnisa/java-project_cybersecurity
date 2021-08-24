@@ -17,7 +17,7 @@ public class RestrictedServerApiService extends BaseApiService {
         return (boolean) res.getPayload();
     }
 
-    public boolean useNotification(String swabCode, String cf) {
+    public boolean useNotification(byte[] swabCode, String cf) {
         Serializable payload = new UseNotificationMessage(swabCode, cf);
         Response res = sendRequest("USE_NOTIFICATION", payload, "useNotification");
         return (boolean) res.getPayload();

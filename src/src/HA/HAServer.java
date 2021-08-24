@@ -22,7 +22,6 @@ public class HAServer extends SSLServer {
 
     private final LinkedList<String> availableNotificationTokens = new LinkedList<>();
     private final LinkedList<Integer> toBeNotifiesUserIds = new LinkedList<>();
-    private final LinkedList<String> nextPositiveUsers = new LinkedList<>();
     private final RestrictedServerApiService restrictedServerApiService;
 
     public HAServer(String password) throws IOException {
@@ -52,14 +51,6 @@ public class HAServer extends SSLServer {
         } catch (Exception e) {
             Logger.getGlobal().warning(endpointName + ' ' + e.getMessage());
             return Response.error("Internal server error");
-//        }
-//            String cf = (String) req.getPayload();
-//            boolean success = notifyPositiveUser(cf);
-//            return Response.make(success);
-//        } catch (Exception e) {
-//            Logger.getGlobal().warning("Server Internal Error: " + e.getMessage());
-//            return Response.error("Server Internal Error");
-//        }
         }
     }
 
@@ -75,7 +66,7 @@ public class HAServer extends SSLServer {
             }
         };
         Timer tm1 = new Timer();
-        tm1.schedule(task1, 1000, 1000);
+        tm1.schedule(task1, Config.TSEME*10, Config.TSEME*10);
 
         TimerTask task2 = new TimerTask() {
             public void run() {
@@ -93,27 +84,12 @@ public class HAServer extends SSLServer {
     }
 
     public void notifyPositiveUser() {
-        String cf;
-        if (!toBeNotifiesUserIds.isEmpty()) {
-            Integer id = RandomUtils.pickOne(toBeNotifiesUserIds);
-            cf = "CF" + id;
-        } else if (!nextPositiveUsers.isEmpty()) {
-            cf = RandomUtils.pickOne(nextPositiveUsers);
-        } else if (RandomUtils.randomIntFromInterval(0, 20) == 21) { // TODO: Change
-            cf = RandomUtils.pickOne(SimulationData.VALID_CF_LIST);
-        } else {
-            return;
-        }
-        if (!restrictedServerApiService.notifyPositiveUser(cf)) {
-            Logger.getGlobal().warning("Failed to notify positive user");
-        } else {
-            nextPositiveUsers.remove(cf);
-            Logger.getGlobal().info("Successfully notify positive user");
-        }
+        String cf = RandomUtils.pickOne(SimulationData.VALID_CF_LIST);
+        restrictedServerApiService.notifyPositiveUser(cf);
     }
 
     public void useNotification() {
-        String testCf = RandomUtils.pickOne(SimulationData.VALID_CF_LIST);
+        /*String testCf = RandomUtils.pickOne(SimulationData.VALID_CF_LIST);
         String testCode = RandomUtils.pickOne(availableNotificationTokens);
         if (testCf != null && testCode != null) {
             try {
@@ -125,7 +101,7 @@ public class HAServer extends SSLServer {
             } catch (RequestFailedException e) {
                 Logger.getGlobal().info("Failed to use notification");
             }
-        }
+        }*/
     }
 
     public boolean isCfValid(String cf) {
@@ -143,5 +119,4 @@ public class HAServer extends SSLServer {
         Logger.getGlobal().info("Added '" + userIds.size() + "' userIds, now there are '" + toBeNotifiesUserIds.size() + "' userIds");
         return result;
     }
-
 }
