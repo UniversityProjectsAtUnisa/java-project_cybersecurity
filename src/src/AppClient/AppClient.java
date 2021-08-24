@@ -1,17 +1,17 @@
 package src.AppClient;
 
+import apis.PublicHaApiService;
 import apis.ServerApiService;
 import core.tokens.AuthToken;
 import entities.PositiveContact;
-import utils.BytesUtils;
-import utils.Credentials;
+import src.AppServer.ServerUtils;
+import utils.*;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import utils.AppTimer;
-import utils.Config;
 import java.util.*;
+import java.util.logging.Logger;
 
 public class AppClient {
     public enum AppClientState {
@@ -22,6 +22,7 @@ public class AppClient {
     private static final double MAX_DISTANCE = 4.0;
 
     private final ServerApiService serverApi = new ServerApiService();
+    private final PublicHaApiService haApi = new PublicHaApiService();
     private final LocalStorage storage = new LocalStorage();
     private AppClientState appState = AppClientState.NOT_LOGGED;
     private final BluetoothModule ble = new BluetoothModule();
@@ -32,7 +33,7 @@ public class AppClient {
 
     public AppClient() {
         AppTimer.getInstance().subscribe(this);
-        long instant = new Date().getTime() / Config.TC;
+        long instant = ServerUtils.getNow().getTime() / Config.TC;
         startNewInterval(instant);
     }
 
@@ -89,11 +90,32 @@ public class AppClient {
         if (positiveSeeds != null) {
             LinkedList<Seed> pairs = findContactPairs(positiveSeeds);
             // SEND TO SERVER ALL PAIR FOUND
-            if (pairs.size() * Config.TC >= 15 * 60 * 1000) {  // 15 * 60 * 1000 are millis in 15 minutes
+            Logger.getGlobal().info(String.format("User(%s) has %d risk time", tmpCredentials.getCf(), pairs.size() * Config.TC));
+            if (pairs.size() * Config.TC >= Config.RISK_TIME) {
                 byte[] notification = serverApi.reportContacts(pairs, token);  // TODO: USE NOTIFICATION IN SOME WAY
-                if (notification != null) storage.clear();
+                if (notification != null) {
+                    storage.clear();
+                    Logger.getGlobal().info(String.format("User(%s) is at risk!", tmpCredentials.getCf()));
+                    TimerTask task = new TimerTask() {
+                        public void run() {
+                            useNotification(notification);
+                        }
+                    };
+                    new Timer().schedule(task, 1500);
+                }
             }
         }
+    }
+
+    public void useNotification(byte[] notification) {
+        UserNotification un = new UserNotification(notification, tmpCredentials.getCf());
+        Logger.getGlobal().info(String.format("User(%s) is using notification token", tmpCredentials.getCf()));
+        boolean isSwabUsed = haApi.useNotification(un);
+        Logger.getGlobal().info(String.format(
+                "User(%s) %s il tampone gratuito",
+                tmpCredentials.getCf(),
+                isSwabUsed ? "ha usato con successo" : "non è riuscito ad usare"
+        ));
     }
 
     public void startNewInterval(long intervalStart) {
@@ -106,7 +128,7 @@ public class AppClient {
             r.nextBytes(seedGen);
             seed = new Seed(intervalStart, seedGen);
             currentIntervalReceivedCodes = new LinkedList<>();
-            storage.printHistory();
+            // storage.printHistory();
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
             System.exit(1);
@@ -137,17 +159,19 @@ public class AppClient {
 
         for (Seed positiveSeed: positiveSeeds) {
             long genDate = positiveSeed.getGenDate();
-            byte[] userSeed = seedHistory.get(genDate).getValue();
-            List<CodePair> codes = contactHistory.get(genDate);
-            // FOR EACH INSTANT IN THE INTERVAL
-            for (int i=0; i < tcCountInInterval; i++) {
-                long instant = genDate + i * Config.TC;
-                byte[] positiveCode = generateCode(positiveSeed.getValue(), instant);
-                // SEARCH: CODE_POSITIVE == CODE_RECEIVED AND INSTANT_POSITIVE == INSTANT_RECEIVED
-                for (CodePair receivedCode: codes) {
-                    if (receivedCode.getInstant() == instant && Arrays.equals(receivedCode.getCode(), positiveCode)) {
-                        contactPairs.add(new Seed(instant, userSeed));
-                        break;
+            if (seedHistory.containsKey(genDate)) {
+                byte[] userSeed = seedHistory.get(genDate).getValue();
+                List<CodePair> codes = contactHistory.get(genDate);
+                // FOR EACH INSTANT IN THE INTERVAL
+                for (int i=0; i < tcCountInInterval; i++) {
+                    long instant = genDate + i * Config.TC;
+                    byte[] positiveCode = generateCode(positiveSeed.getValue(), instant);
+                    // SEARCH: CODE_POSITIVE == CODE_RECEIVED AND INSTANT_POSITIVE == INSTANT_RECEIVED
+                    for (CodePair receivedCode: codes) {
+                        if (receivedCode.getInstant() == instant && Arrays.equals(receivedCode.getCode(), positiveCode)) {
+                            contactPairs.add(new Seed(instant, userSeed));
+                            break;
+                        }
                     }
                 }
             }

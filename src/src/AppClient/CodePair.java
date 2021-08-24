@@ -1,6 +1,8 @@
 package src.AppClient;
 
-public class CodePair {
+import java.io.Serializable;
+
+public class CodePair implements Serializable {
     private final byte[] code;
     private final long instant;
 

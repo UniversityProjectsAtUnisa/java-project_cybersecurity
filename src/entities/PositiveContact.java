@@ -1,13 +1,12 @@
 package entities;
 
 import src.AppClient.CodePair;
-import src.AppServer.ServerUtils;
 
-import java.sql.Timestamp;
-import java.util.HashMap;
+import java.io.Serializable;
+import java.util.Arrays;
 import java.util.List;
 
-public class PositiveContact {
+public class PositiveContact implements Serializable {
     private final byte[] seed;
     private final long seedCreationDate;
     private final List<CodePair> detectedCodes;
@@ -28,5 +27,14 @@ public class PositiveContact {
 
     public List<CodePair> getDetectedCodes() {
         return detectedCodes;
+    }
+
+    @Override
+    public String toString() {
+        return "PositiveContact{" +
+                "seed=" + Arrays.toString(seed) +
+                ", seedCreationDate=" + seedCreationDate +
+                ", detectedCodes=" + detectedCodes +
+                '}';
     }
 }

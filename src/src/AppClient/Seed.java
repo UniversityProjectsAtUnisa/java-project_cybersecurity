@@ -1,8 +1,10 @@
 package src.AppClient;
 
+import java.io.Serializable;
+import java.util.Arrays;
 import java.util.Objects;
 
-public class Seed {
+public class Seed implements Serializable {
     private final long genDate;
     private final byte[] value;
 
@@ -30,5 +32,13 @@ public class Seed {
     @Override
     public int hashCode() {
         return Objects.hash(genDate);
+    }
+
+    @Override
+    public String toString() {
+        return "Seed{" +
+                "genDate=" + genDate +
+                ", value=" + Arrays.toString(value) +
+                '}';
     }
 }

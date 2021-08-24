@@ -2,16 +2,8 @@ package utils;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
 
 public class BytesUtils {
-
-    public static int TIMESTAMP_BYTES_SIZE = Timestamp.valueOf(LocalDateTime.MIN).toString().getBytes().length;
-
-    public static byte[] zeroes(int length) {
-        return new byte[length];
-    }
 
     public static byte[] fromLong(long x) {
         ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
@@ -23,13 +15,6 @@ public class BytesUtils {
         ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
         buffer.put(0, bytes);
         return buffer.getLong();
-    }
-
-    public static byte[] fromTimestamp(Timestamp t) {
-        if (t == null) {
-            return BytesUtils.zeroes(BytesUtils.TIMESTAMP_BYTES_SIZE);
-        }
-        return t.toString().getBytes();
     }
 
     public static byte[] concat(byte[] a, byte[] b) {

@@ -2,6 +2,7 @@ package utils;
 
 import src.AppClient.AppClient;
 import src.AppClient.BluetoothModule;
+import src.AppServer.ServerUtils;
 
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
@@ -35,12 +36,12 @@ public class AppTimer {
 
     private void onTimeout() {
         Logger.getGlobal().info("GlobalTimer Timeout");
-        long instant = new Date().getTime() / Config.TC;
+        long instant = ServerUtils.getNow().getTime() / Config.TC;
 
         long n = instant % (Config.TSEME / Config.TC);
         if (n == 0) {
             clients.forEach(appClient -> appClient.startNewInterval(instant));
-        } else if (n == Config.TSEME / Config.TC -1) {
+        } else if (n == Config.TSEME / Config.TC -2) {
             clients.forEach(AppClient::intervalRoutine);
         }
 

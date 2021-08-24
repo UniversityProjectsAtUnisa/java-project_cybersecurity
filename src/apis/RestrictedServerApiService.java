@@ -2,9 +2,7 @@ package apis;
 
 import core.Response;
 import utils.Config;
-import utils.UseNotificationMessage;
-
-import java.io.Serializable;
+import utils.UserNotification;
 
 public class RestrictedServerApiService extends BaseApiService {
 
@@ -17,9 +15,8 @@ public class RestrictedServerApiService extends BaseApiService {
         return (boolean) res.getPayload();
     }
 
-    public boolean useNotification(byte[] swabCode, String cf) {
-        Serializable payload = new UseNotificationMessage(swabCode, cf);
-        Response res = sendRequest("USE_NOTIFICATION", payload, "useNotification");
+    public boolean useNotification(UserNotification notice) {
+        Response res = sendRequest("USE_NOTIFICATION", notice, "useNotification");
         return (boolean) res.getPayload();
     }
 }

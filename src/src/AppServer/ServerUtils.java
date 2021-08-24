@@ -6,31 +6,18 @@ import java.security.KeyStore;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.sql.Time;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Date;
 
 import utils.BytesUtils;
-import utils.Config;
 
 public class ServerUtils {
 
     static DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd H:mm:ss");
-    
-    public static Timestamp getLastValidDateForContact() {
-        return Timestamp.valueOf(LocalDateTime.now().minusDays(Config.CONTACT_DURATION_DAYS));
-    }
-    
-    public static Timestamp getNotificationTokenExpireDays() {
-        return Timestamp.valueOf(LocalDateTime.now().plusDays(Config.NOTIFICATION_EXPIRE_DAYS));
-    }
 
     public static String toString(
             byte[] bytes,

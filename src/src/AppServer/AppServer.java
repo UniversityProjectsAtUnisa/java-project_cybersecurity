@@ -127,13 +127,12 @@ public class AppServer {
         try {
             switch (endpointName) {
                 case "USE_NOTIFICATION":
-                    UseNotificationMessage notice = (UseNotificationMessage) req.getPayload();
-                    data = useNotification(notice.getSwabCode(), notice.getCf());
+                    UserNotification notice = (UserNotification) req.getPayload();
+                    data = useNotification(notice.getFullSwab(), notice.getCf());
                     break;
                 case "NOTIFY_POSITIVE_USER":
                     String cf = (String) req.getPayload();
                     data = notifyPositiveUser(cf);
-                    System.out.println("NOTIFY POSITIVE USER DATA: " + data);
                     break;
             }
             return Response.make(data);
@@ -261,10 +260,8 @@ public class AppServer {
 
     // FASE 4
     public LinkedList<Seed> getPositiveSeed(User user) {
-        // CHECK: lastRiskRequestDate not in current interval, hadRequestSeed=false
-        if (user.getHadRequestSeed(keyInfo))
-            return null;
-        else if (isDateInCurrentInterval(user.getLastRiskRequestDate(keyInfo)))
+        // CHECK: lastRiskRequestDate not in current interval
+        if (isDateInCurrentInterval(user.getLastRiskRequestDate(keyInfo)))
             return null;
         // FILTER SEEDS WHERE: data_generazione > max(data_corrente - 20 giorni,  data_minima_semi)
         long minSeedDate = user.getMinimumSeedDate(keyInfo);
@@ -272,7 +269,7 @@ public class AppServer {
                 .getAllPositiveSeeds()
                 .stream()
                 .filter(s -> {
-                    long dMin = Math.max(minSeedDate, ServerUtils.getNow().getTime());
+                    long dMin = Math.max(minSeedDate, ServerUtils.getNow().getTime() - 20 * 24 * 60 * 60 * 1000);
                     return s.getGenDate() > dMin / Config.TC;
                 })
                 .toList();
@@ -292,7 +289,7 @@ public class AppServer {
         // Compute valid contact reports
         int n = countValidContactReports(userSeeds);
         // if user is at risk: n * Tc > millis(15)
-        if (n * Config.TC > 15 * 60 * 1000) {
+        if (n * Config.TC > Config.RISK_TIME) {
             // GENERATE SWAB SALT
             byte[] swabSalt = new byte[32];
             swabGenerator.nextBytes(swabSalt);
@@ -312,12 +309,13 @@ public class AppServer {
 
     // HA REQUESTS
     public boolean useNotification(byte[] fullSwab, String cf) throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+        Logger.getGlobal().info(String.format("User(%s) is using a swab", cf));
         // CHECK SWAB SIGMA
         int splitPoint = fullSwab.length - 32;  // 32 is the length of hmac sigma
         byte[] encryptedSWAB = Arrays.copyOfRange(fullSwab, 0, splitPoint);
         byte[] userHmac = Arrays.copyOfRange(fullSwab, splitPoint, fullSwab.length);
         byte[] newHmac = computeSwabSigma(encryptedSWAB);
-        if (ServerUtils.secureByteCompare(userHmac, newHmac))
+        if (!ServerUtils.secureByteCompare(userHmac, newHmac))
             return false;
 
         Swab dbSwab = database.findSwab(encryptedSWAB);
@@ -327,8 +325,10 @@ public class AppServer {
         // CHECK: SWAB.IS_USED=FALSE
         if (dbSwab.isUsed())
             return false;
-        if (ServerUtils.getNow().getTime() - dbSwab.getCreationDate().getTime() != Config.SWAB_DATE_OFFSET)  // FIXME: troppo restrittivo
-            return false;
+        // CHECK: If the swab is valid in the current date
+        // L'abbiamo commentato perché è troppo restrittiva e complica la simulazione
+        /* if (ServerUtils.getNow().getTime() - dbSwab.getCreationDate().getTime() != Config.SWAB_DATE_OFFSET)
+            return false; */
         // UPDATE DATABASE: set swab.is_used to true
         database.updateSwab(encryptedSWAB, true);
         // CHECK: CF
@@ -346,7 +346,8 @@ public class AppServer {
         byte[] hashedCf = ServerUtils.encryptWithSalt(cf.getBytes(), saltCf);
         User user = database.findUser(hashedCf);
         if (user != null) {
-            database.updateUser(hashedCf, null, ServerUtils.getNow(), null, keyInfo);
+            database.updateUser(hashedCf, null, ServerUtils.getNow(), null, true, keyInfo);
+            Logger.getGlobal().info(String.format("New positive user: %s", cf));
         } else {
             Logger.getGlobal().warning("404: USER NOT FOUND -> notifyPositiveUser");
         }
@@ -398,6 +399,7 @@ public class AppServer {
     private boolean isDateInCurrentInterval(long date) {
         long now = ServerUtils.getNow().getTime();
         long tStart = now - (now % Config.TSEME);
+        // System.out.format("%d - %d - %d\n", now, tStart, tStart + Config.TSEME);
         return date >= tStart && date <= tStart + Config.TSEME;
     }
 

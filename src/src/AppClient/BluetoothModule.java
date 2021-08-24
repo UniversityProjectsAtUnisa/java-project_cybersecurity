@@ -41,7 +41,7 @@ public class BluetoothModule {
     public static void populateRandomUserMap() {
         List<Integer> userNums = Arrays.asList(codeMap.keySet().toArray(Integer[]::new));
 
-        int contactCount = codeMap.size() / 2;
+        int contactCount = codeMap.size() * 10;
         for (int i=0; i < contactCount; i++) {
             Integer first = RandomUtils.pickOne(userNums);
             Integer last = RandomUtils.pickOne(userNums);

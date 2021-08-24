@@ -1,27 +1,16 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package core.tokens;
 
 import exceptions.InvalidTokenFormatException;
-import src.AppServer.ServerRunner;
-import src.AppServer.ServerUtils;
 import utils.BytesUtils;
 
 import javax.crypto.*;
-import javax.crypto.spec.SecretKeySpec;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Arrays;
 
 /**
- * Auth: BASE64(id, data_creazione).HMACSHA256(BASE64(id, data_creazione),
- * sale_2)
+ * AES(KEYtoken, “CF, data_creazione”).HMAC(AES(KEYtoken, “CF, data_creazione”), SALTtoken)
  */
 public final class AuthToken extends Token {
 

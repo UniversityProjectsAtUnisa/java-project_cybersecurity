@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package core.tokens;
 
 import src.AppServer.ServerUtils;
@@ -22,12 +17,7 @@ import utils.BytesUtils;
 import java.util.Arrays;
 import java.util.Objects;
 
-/**
- * Auth: BASE64(id, data_creazione).HMACSHA256(BASE64(id, data_creazione),
- * sale_2) Notification: BASE64(id, data_scadenza).HMACSHA256(BASE64(id,
- * data_scadenza),SHA256(sale_2 || SHA256(sale_1 || codice_fiscale)))
- */
-public abstract class Token implements Serializable, Comparable<Token> {
+public abstract class Token implements Serializable {
 
     private byte[] payload;
     private byte[] sigma;
@@ -96,14 +86,5 @@ public abstract class Token implements Serializable, Comparable<Token> {
     protected boolean verifySigma(byte[] key) throws InvalidKeyException, NoSuchAlgorithmException {
         byte[] calculatedSigma = this.calculateSigma(this.payload, key);
         return ServerUtils.secureByteCompare(calculatedSigma, this.sigma);
-    }
-
-    @Override
-    public int compareTo(Token o) {
-        int c = Arrays.compare(payload, o.getPayload());   // FIXME: a che serve? deve essere sicura?
-        if (c == 0) {
-            c = Arrays.compare(sigma, o.getSigma());   // FIXME: a che serve? deve essere sicura?
-        }
-        return c;
     }
 }
