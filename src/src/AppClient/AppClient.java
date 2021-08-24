@@ -92,7 +92,7 @@ public class AppClient {
             // SEND TO SERVER ALL PAIR FOUND
             Logger.getGlobal().info(String.format("User(%s) has %d risk time", tmpCredentials.getCf(), pairs.size() * Config.TC));
             if (pairs.size() * Config.TC >= Config.RISK_TIME) {
-                byte[] notification = serverApi.reportContacts(pairs, token);  // TODO: USE NOTIFICATION IN SOME WAY
+                byte[] notification = serverApi.reportContacts(pairs, token);
                 if (notification != null) {
                     storage.clear();
                     Logger.getGlobal().info(String.format("User(%s) is at risk!", tmpCredentials.getCf()));

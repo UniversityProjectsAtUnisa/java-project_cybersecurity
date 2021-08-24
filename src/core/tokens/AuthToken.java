@@ -4,6 +4,9 @@ import exceptions.InvalidTokenFormatException;
 import utils.BytesUtils;
 
 import javax.crypto.*;
+import javax.crypto.spec.IvParameterSpec;
+import java.io.Serializable;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
@@ -13,14 +16,21 @@ import java.util.Arrays;
  * AES(KEYtoken, “CF, data_creazione”).HMAC(AES(KEYtoken, “CF, data_creazione”), SALTtoken)
  */
 public final class AuthToken extends Token {
+    private final byte[] iv;
 
-    public AuthToken(byte[] hashedCf, SecretKey keyToken, byte[] saltToken, Timestamp creationDate) throws NoSuchAlgorithmException,
-            InvalidKeyException, IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException {
-        super(AuthToken.getEncryptedToken(hashedCf, keyToken, creationDate), saltToken);
+    public AuthToken(byte[] hashedCf, SecretKey keyToken, byte[] saltToken, Timestamp creationDate, byte[] iv) throws NoSuchAlgorithmException,
+            InvalidKeyException, IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException, InvalidAlgorithmParameterException {
+        super(AuthToken.getEncryptedToken(hashedCf, keyToken, creationDate, iv), saltToken);
+        this.iv = iv;
+    }
+
+    public static AuthToken createToken(byte[] hashedCf, SecretKey keyToken, byte[] saltToken, Timestamp creationDate) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
+        byte[] newIv = new byte[getCipher().getBlockSize()];
+        return new AuthToken(hashedCf, keyToken, saltToken, creationDate, newIv);
     }
 
     private static Cipher getCipher() throws NoSuchAlgorithmException, NoSuchPaddingException {
-        return Cipher.getInstance("AES/ECB/PKCS5Padding");
+        return Cipher.getInstance("AES/CBC/PKCS5Padding");
     }
 
     public byte[] getCfToken(SecretKey keyToken) throws Exception {
@@ -45,24 +55,24 @@ public final class AuthToken extends Token {
         return lastLogin.getTime() == createdAt.getTime() && verifySigma(saltToken);
     }
 
-    static byte[] getEncryptedToken(byte[] hashedCf, SecretKey keyToken, Timestamp creationDate) throws InvalidKeyException,
-            IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException, NoSuchAlgorithmException {
-        Cipher cipher = getCipher();
+    public static byte[] getEncryptedToken(byte[] hashedCf, SecretKey keyToken, Timestamp creationDate, byte[] iv) throws InvalidKeyException,
+            IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException {
         byte[] payloadStr = BytesUtils.concat(hashedCf, BytesUtils.fromLong(creationDate.getTime()));
-        cipher.init(Cipher.ENCRYPT_MODE, keyToken);
+        Cipher cipher = getCipher();
+        cipher.init(Cipher.ENCRYPT_MODE, keyToken, new IvParameterSpec(iv));
         return cipher.doFinal(payloadStr);
     }
 
     private byte[] getDecryptedPayload(SecretKey keyToken) throws NoSuchAlgorithmException, NoSuchPaddingException {
         try {
             Cipher cipher = getCipher();
-            cipher.init(Cipher.DECRYPT_MODE, keyToken);
+            cipher.init(Cipher.DECRYPT_MODE, keyToken, new IvParameterSpec(iv));
             byte[] decodedPayload = cipher.doFinal(getPayload());
             if (decodedPayload.length - Long.BYTES < 0) {
                 throw new InvalidTokenFormatException("The payload length is not valid");
             }
             return decodedPayload;
-        } catch (IllegalBlockSizeException | BadPaddingException | InvalidKeyException e) {
+        } catch (IllegalBlockSizeException | BadPaddingException | InvalidKeyException | InvalidAlgorithmParameterException e) {
             e.printStackTrace();
         }
         throw new RuntimeException("Decrypt Token Payload!");

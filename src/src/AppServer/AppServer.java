@@ -22,18 +22,21 @@ import src.AppClient.Seed;
 import utils.*;
 
 import javax.crypto.*;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.naming.AuthenticationException;
 
 /**
- * Endpoints: Login login({codice_fiscale, password}) -> token Registrazione
- * register({codice_fiscale, password}) -> boolean Segnalazione contatto
- * createReport({id2, duration, data}, token) -> boolean Richiesta notifiche
- * getNotifications(token) -> Notification[] Verifica e Disabilita codice
- * tampone gratuito useNotification({code}) -> boolean Richiesta informazioni
- * codice tampone gratuito getNotificationDetails({code}, token) ->
- * NotificationDetail Tampone con risultato positivo dall’HA
- * notifyPositiveUser({codice_fiscale}) -> boolean
+ * USERS ENDPOINTS:
+ *      - LOGIN: (codiceFiscale, password) -> Token di Autenticazione.
+ *      - REGISTER: (codiceFiscale, password}) -> Esito registrazione.
+ *      - IS_POSITIVE: (authToken) -> Vero se l'utente è positivo altrimenti Falso.
+ *      - SEND_POSITIVE_DATA: (authToken, listaCoppieSemeIstante) -> Vero se l'operazione è terminata con successo altrimenti, Falso.
+ *      - GET_POSITIVE_SEEDS: (authToken) -> Lista delle coppie (semePositivo, instanteGenerazioneSeme).
+ *      - IS_AT_RISK: (authToken, listaCoppieSemeInstate) -> Il codice tampone gratuito se l'operazione termina con successo, altrimenti null.
+ * HA ENDPOINTS:
+ *      - USE_NOTIFICATION: (codiceTamponeGratuito, codiceFiscale) -> Vero se l'operazione termina con successo, altrimenti Falso.
+ *      - NOTIFY_POSITIVE_USER: (codiceFiscale) -> Vero se l'operazione termina con successo, altrimenti Falso.
  */
 public class AppServer {
 
@@ -52,7 +55,7 @@ public class AppServer {
     private final SecretKey keySigmaSwab;
     private final SecretKey keySwab;
 
-    private final Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");  // FIXME: CHANGE ECB TO CBC
+    private final Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 
     /**
      * saltPasswordGenerator is a csPRG that uses: seedPassword
@@ -199,7 +202,7 @@ public class AppServer {
         }
     }
 
-    public AuthToken login(String cf, String password) throws NoSuchAlgorithmException, InvalidKeyException, AuthenticationException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
+    public AuthToken login(String cf, String password) throws NoSuchAlgorithmException, InvalidKeyException, AuthenticationException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
         byte[] cfBytes = cf.getBytes();
         byte[] hashedCf = ServerUtils.encryptWithSalt(cfBytes, this.saltCf);
         User user = this.database.findUser(hashedCf);
@@ -212,7 +215,7 @@ public class AppServer {
 
         if (Arrays.equals(hashedPassword, user.getHashedPassword())) {
             Timestamp d = ServerUtils.getNow();
-            AuthToken token = new AuthToken(hashedCf, keyToken, saltToken, d);
+            AuthToken token = AuthToken.createToken(hashedCf, keyToken, saltToken, d);
             this.database.updateUser(hashedCf, d, null, null, keyInfo);
             return token;
         }
@@ -278,7 +281,7 @@ public class AppServer {
         return new LinkedList<>(filtered);
     }
 
-    public byte[] isAtRisk(User user, List<Seed> userSeeds) throws IllegalBlockSizeException, BadPaddingException, InvalidKeyException, NoSuchAlgorithmException {
+    public byte[] isAtRisk(User user, List<Seed> userSeeds) throws IllegalBlockSizeException, BadPaddingException, InvalidKeyException, NoSuchAlgorithmException, InvalidAlgorithmParameterException {
         // CHECK: lastRiskRequestDate in current interval, hadRequestSeed=true
         if (!user.getHadRequestSeed(keyInfo))
             return null;
@@ -295,7 +298,7 @@ public class AppServer {
             swabGenerator.nextBytes(swabSalt);
             // GENERATE AND SAVE ENCRYPTED SWAB
             byte[] swabCf = BytesUtils.concat(user.getHashedCf(), swabSalt);
-            cipher.init(Cipher.ENCRYPT_MODE, keySwab);
+            cipher.init(Cipher.ENCRYPT_MODE, keySwab, new IvParameterSpec(new byte[cipher.getBlockSize()]));
             byte[] encryptedSwab = cipher.doFinal(swabCf);
             database.createSwab(encryptedSwab, ServerUtils.getNow());
             // GENERATE SWAB SIGMA
@@ -308,7 +311,7 @@ public class AppServer {
     }
 
     // HA REQUESTS
-    public boolean useNotification(byte[] fullSwab, String cf) throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+    public boolean useNotification(byte[] fullSwab, String cf) throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
         Logger.getGlobal().info(String.format("User(%s) is using a swab", cf));
         // CHECK SWAB SIGMA
         int splitPoint = fullSwab.length - 32;  // 32 is the length of hmac sigma
@@ -332,7 +335,7 @@ public class AppServer {
         // UPDATE DATABASE: set swab.is_used to true
         database.updateSwab(encryptedSWAB, true);
         // CHECK: CF
-        cipher.init(Cipher.DECRYPT_MODE, keySwab);
+        cipher.init(Cipher.DECRYPT_MODE, keySwab, new IvParameterSpec(new byte[cipher.getBlockSize()]));
         byte[] decryptedSwab = cipher.doFinal(encryptedSWAB);
         byte[] hashedCf = Arrays.copyOfRange(decryptedSwab, 0, decryptedSwab.length - 32);
         if (!Arrays.equals(ServerUtils.encryptWithSalt(cf.getBytes(), saltCf), hashedCf))

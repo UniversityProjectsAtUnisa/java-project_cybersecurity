@@ -36,15 +36,6 @@ public abstract class Token implements Serializable {
         return hMac.doFinal();
     }
 
-    public Token(byte[] raw) {
-        int splitPoint = raw.length - 32;
-        if (splitPoint < 0) {
-            throw new InvalidTokenFormatException("The raw byte string length is not valid.");
-        }
-        this.payload = Arrays.copyOfRange(raw, 0, splitPoint);
-        this.sigma = Arrays.copyOfRange(raw, splitPoint, raw.length);
-    }
-
     public byte[] getPayload() {
         return payload;
     }
