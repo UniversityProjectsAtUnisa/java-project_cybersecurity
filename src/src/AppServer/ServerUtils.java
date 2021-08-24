@@ -3,21 +3,14 @@ package src.AppServer;
 import javax.crypto.SecretKey;
 import java.io.*;
 import java.security.KeyStore;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 
 import utils.BytesUtils;
 
 public class ServerUtils {
-
-    static DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd H:mm:ss");
 
     public static String toString(
             byte[] bytes,
@@ -35,18 +28,6 @@ public class ServerUtils {
             byte[] bytes) {
         return toString(bytes, bytes.length);
     }
-
-    public static byte[] toByteArray(
-            String string) {
-        byte[] bytes = new byte[string.length()];
-        char[] chars = string.toCharArray();
-
-        for (int i = 0; i != chars.length; i++) {
-            bytes[i] = (byte) chars[i];
-        }
-
-        return bytes;
-    }
     
     public static byte[] encryptWithSalt(byte[] data, byte[] salt) {
         byte[] concatenation = BytesUtils.concat(salt, data);
@@ -57,27 +38,6 @@ public class ServerUtils {
             System.exit(2);
         }
         throw new RuntimeException("NoSuchAlgorithmException in ServerUtils.encryptWithSalt");
-    }
-
-    public static boolean fileWrite(String path, String content) throws IOException {
-        try (FileWriter fileWriter = new FileWriter(path)) {
-            String fileContent = content;
-            fileWriter.write(fileContent);
-        } catch (IOException e) {
-            return false;
-        }
-        return true;
-    }
-
-    public static String fileRead(String path) throws IOException {
-        String content = "";
-        FileReader fileReader = new FileReader(path);
-        int ch = fileReader.read();
-        while (ch != -1) {
-            content += ch;
-            fileReader.close();
-        }
-        return content;
     }
 
     public static void storeToKeyStore(SecretKey keyToStore, String password, String filepath, String keyAlias) throws Exception {
@@ -99,8 +59,7 @@ public class ServerUtils {
             KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
             InputStream readStream = new FileInputStream(filepath);
             keyStore.load(readStream, password.toCharArray());
-            SecretKey key = (SecretKey) keyStore.getKey(keyAlias, password.toCharArray());
-            return key;
+            return (SecretKey) keyStore.getKey(keyAlias, password.toCharArray());
         } catch (Exception e) {
             System.out.println(e);
         }
@@ -109,53 +68,6 @@ public class ServerUtils {
 
     public static Timestamp getNow() {
         return Timestamp.from(Instant.now());
-    }
-
-    public static Timestamp maxTimestamp(Timestamp t1, Timestamp t2) {
-        if (t1.compareTo(t2) > 0) {
-            return t1;
-        } else {
-            return t2;
-        }
-    }
-
-    public static Timestamp minTimestamp(Timestamp t1, Timestamp t2) {
-        if (t1.compareTo(t2) > 0) {
-            return t2;
-        } else {
-            return t1;
-        }
-    }
-
-    public static int diffTimestampMillis(Timestamp t1, Timestamp t2)  {
-        long timeT1 = t1.getTime();
-        long timeT2 = t2.getTime();
-        long diff = Math.round(Math.abs(timeT1 - timeT2));
-        return (int) diff;
-    }
-    
-    public static Timestamp addDays(Timestamp startDate, int days){
-        LocalDateTime cEndDate = startDate.toLocalDateTime().plusDays(days);
-        String strCEndDate = cEndDate.format(formatter);
-        return Timestamp.valueOf(strCEndDate);
-    }
-
-    public static Timestamp minusDays(Timestamp startDate, int days){
-        LocalDateTime cEndDate = startDate.toLocalDateTime().minusDays(days);
-        String strCEndDate = cEndDate.format(formatter);
-        return Timestamp.valueOf(strCEndDate);
-    }
-
-    public static Timestamp addMillis(Timestamp startDate, int millis){
-        LocalDateTime cEndDate = startDate.toLocalDateTime().plusNanos(millis * 1000);
-        String strCEndDate = cEndDate.format(formatter);
-        return Timestamp.valueOf(strCEndDate);
-    }
-
-    public static Timestamp minusMillis(Timestamp startDate, int millis){
-        LocalDateTime cEndDate = startDate.toLocalDateTime().minusNanos(millis * 1000);
-        String strCEndDate = cEndDate.format(formatter);
-        return Timestamp.valueOf(strCEndDate);
     }
 
     public static boolean dumbStringCompare(String str1, String str2) {

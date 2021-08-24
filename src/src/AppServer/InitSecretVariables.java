@@ -14,7 +14,9 @@ public class InitSecretVariables {
             "saltCode",
             "keyToken",
             "keySwab",
-            "keyInfo"
+            "keyInfo",
+            "seedTokenIv",
+            "seedSwabIv"
     };
 
     public static void main(String[] args) throws Exception {

@@ -9,6 +9,7 @@ import java.io.Serializable;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.sql.Timestamp;
 import java.util.Arrays;
 
@@ -24,8 +25,9 @@ public final class AuthToken extends Token {
         this.iv = iv;
     }
 
-    public static AuthToken createToken(byte[] hashedCf, SecretKey keyToken, byte[] saltToken, Timestamp creationDate) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
+    public static AuthToken createToken(byte[] hashedCf, SecretKey keyToken, byte[] saltToken, Timestamp creationDate, SecureRandom sr) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
         byte[] newIv = new byte[getCipher().getBlockSize()];
+        sr.nextBytes(newIv);
         return new AuthToken(hashedCf, keyToken, saltToken, creationDate, newIv);
     }
 

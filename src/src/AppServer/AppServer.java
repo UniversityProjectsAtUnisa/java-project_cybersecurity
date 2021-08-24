@@ -49,6 +49,9 @@ public class AppServer {
     private final byte[] saltToken;
     private final byte[] saltCode;
 
+    private final byte[] seedTokenIv;
+    private final byte[] seedSwabIv;
+
     private final SecretKey keyToken;
     private final SecretKey keyInfo;
 
@@ -63,6 +66,8 @@ public class AppServer {
      */
     private SecureRandom saltPasswordGenerator;
     private SecureRandom swabGenerator;
+    private SecureRandom tokenIvGenerator;
+    private SecureRandom swabIvGenerator;
 
     /*
     SALTcf è una stringa di 256 bit puramente casuale.
@@ -107,6 +112,10 @@ public class AppServer {
         this.keySigmaSwab = new SecretKeySpec(key1.getEncoded(), 0, key1.getEncoded().length, "AES");
         key1 = ServerUtils.loadFromKeyStore(KEY_STORE, PASSWORD, "saltCode");
         this.saltCode = key1.getEncoded();
+        key1 = ServerUtils.loadFromKeyStore(KEY_STORE, PASSWORD, "seedTokenIv");
+        this.seedTokenIv = key1.getEncoded();
+        key1 = ServerUtils.loadFromKeyStore(KEY_STORE, PASSWORD, "seedSwabIv");
+        this.seedSwabIv = key1.getEncoded();
 
         key1 = ServerUtils.loadFromKeyStore(KEY_STORE, PASSWORD, "keyToken");
         this.keyToken = new SecretKeySpec(key1.getEncoded(), 0, key1.getEncoded().length, "AES");
@@ -117,6 +126,8 @@ public class AppServer {
         // GENERATORS INIT
         saltPasswordGenerator = new SecureRandom(seedPassword);
         swabGenerator = new SecureRandom(seedToken);
+        tokenIvGenerator = new SecureRandom(seedTokenIv);
+        swabIvGenerator = new SecureRandom(seedSwabIv);
     }
 
     public void start() {
@@ -215,7 +226,7 @@ public class AppServer {
 
         if (Arrays.equals(hashedPassword, user.getHashedPassword())) {
             Timestamp d = ServerUtils.getNow();
-            AuthToken token = AuthToken.createToken(hashedCf, keyToken, saltToken, d);
+            AuthToken token = AuthToken.createToken(hashedCf, keyToken, saltToken, d, tokenIvGenerator);
             this.database.updateUser(hashedCf, d, null, null, keyInfo);
             return token;
         }
@@ -298,14 +309,16 @@ public class AppServer {
             swabGenerator.nextBytes(swabSalt);
             // GENERATE AND SAVE ENCRYPTED SWAB
             byte[] swabCf = BytesUtils.concat(user.getHashedCf(), swabSalt);
-            cipher.init(Cipher.ENCRYPT_MODE, keySwab, new IvParameterSpec(new byte[cipher.getBlockSize()]));
+            byte[] iv = new byte[cipher.getBlockSize()];
+            swabIvGenerator.nextBytes(iv);
+            cipher.init(Cipher.ENCRYPT_MODE, keySwab, new IvParameterSpec(iv));
             byte[] encryptedSwab = cipher.doFinal(swabCf);
             database.createSwab(encryptedSwab, ServerUtils.getNow());
             // GENERATE SWAB SIGMA
             byte[] hmac = computeSwabSigma(encryptedSwab);
             // UPDATE USER: set minimum_seed_date to current time
             database.updateUser(user, null, ServerUtils.getNow(), null, keyInfo);
-            return BytesUtils.concat(encryptedSwab, hmac);
+            return BytesUtils.concat(iv, encryptedSwab, hmac);
         }
         return null;
     }
@@ -315,7 +328,8 @@ public class AppServer {
         Logger.getGlobal().info(String.format("User(%s) is using a swab", cf));
         // CHECK SWAB SIGMA
         int splitPoint = fullSwab.length - 32;  // 32 is the length of hmac sigma
-        byte[] encryptedSWAB = Arrays.copyOfRange(fullSwab, 0, splitPoint);
+        byte[] iv = Arrays.copyOfRange(fullSwab, 0, cipher.getBlockSize());
+        byte[] encryptedSWAB = Arrays.copyOfRange(fullSwab, cipher.getBlockSize(), splitPoint);
         byte[] userHmac = Arrays.copyOfRange(fullSwab, splitPoint, fullSwab.length);
         byte[] newHmac = computeSwabSigma(encryptedSWAB);
         if (!ServerUtils.secureByteCompare(userHmac, newHmac))
@@ -335,7 +349,7 @@ public class AppServer {
         // UPDATE DATABASE: set swab.is_used to true
         database.updateSwab(encryptedSWAB, true);
         // CHECK: CF
-        cipher.init(Cipher.DECRYPT_MODE, keySwab, new IvParameterSpec(new byte[cipher.getBlockSize()]));
+        cipher.init(Cipher.DECRYPT_MODE, keySwab, new IvParameterSpec(iv));
         byte[] decryptedSwab = cipher.doFinal(encryptedSWAB);
         byte[] hashedCf = Arrays.copyOfRange(decryptedSwab, 0, decryptedSwab.length - 32);
         if (!Arrays.equals(ServerUtils.encryptWithSalt(cf.getBytes(), saltCf), hashedCf))
