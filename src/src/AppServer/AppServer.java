@@ -40,9 +40,8 @@ import javax.naming.AuthenticationException;
  */
 public class AppServer {
 
-/*    private String salt1 = "";
+    /*    private String salt1 = "";
     private String salt2 = "";*/
-
     private byte[] saltCf = new byte[32];
     private byte[] seedPassword = new byte[32];
     private byte[] seedToken = new byte[32];
@@ -58,10 +57,11 @@ public class AppServer {
     private SecretKey keySwab;
     Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
 
-
     /**
-     * GENERATORsalt_pass è un csPRG che usa come seme di generazione “SEEDpassword” per generare i SALTpassword(user).
-     * GENERATORswab è una csPRG che usa come seme di generazione “SEEDswab” per generare i SALTswab.
+     * GENERATORsalt_pass è un csPRG che usa come seme di generazione
+     * “SEEDpassword” per generare i SALTpassword(user). GENERATORswab è una
+     * csPRG che usa come seme di generazione “SEEDswab” per generare i
+     * SALTswab.
      */
     private SecureRandom saltPasswordGenerator = new SecureRandom(seedPassword);
     private SecureRandom swabGenerator = new SecureRandom(seedToken);
@@ -77,7 +77,6 @@ public class AppServer {
     SALTcode è una stringa di 256 bit puramente casuali.
     KEYsigma_swab è una stringa di 256 bit puramente casuali
     * */
-
     private final Database database;
     private final HAApiService healthApiService;
     private final SSLServer publicServer, restrictedServer;
@@ -111,7 +110,6 @@ public class AppServer {
         this.saltSwab = key1.getEncoded();
         key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "saltCode");
         this.saltCode = key1.getEncoded();
-
 
         key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "keyToken");
         this.keyToken = new SecretKeySpec(key1.getEncoded(), 0, key1.getEncoded().length, "AES");
@@ -225,18 +223,18 @@ public class AppServer {
     }
 
     public AuthToken login(String cf, String password) throws NoSuchAlgorithmException, InvalidKeyException, AuthenticationException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
-        byte[] cfBytes = cf.getBytes(StandardCharsets.UTF_8);
+        byte[] cfBytes = cf.getBytes();
         byte[] hashedCf = ServerUtils.encryptWithSalt(cfBytes, this.saltCf);
         User user = this.database.findUser(hashedCf);
         if (user == null) {
             throw new AuthenticationException("Invalid credentials");
         }
         byte[] passwordBytes = password.getBytes();
-        String info = user.getDecryptedInfo(keyInfo);
-        String saltPassword = info.split("_")[0];
-        byte[] hashedPassword = ServerUtils.encryptWithSalt(passwordBytes, saltPassword.getBytes(StandardCharsets.UTF_8));
+        byte[] passwordSalt = user.getPasswordSalt(keyInfo);
+        System.out.println(Arrays.toString(passwordSalt));
+        byte[] hashedPassword = ServerUtils.encryptWithSalt(passwordBytes, passwordSalt);
 
-        System.out.println(Arrays.toString(saltPassword.getBytes(StandardCharsets.UTF_8)));
+//        System.out.println(Arrays.toString(hashedPassword));
 
         if (Arrays.equals(hashedPassword, user.getHashedPassword())) {
             Timestamp d = ServerUtils.getNow();
@@ -259,15 +257,17 @@ public class AppServer {
         System.out.println(Arrays.toString(passwordSalt));
 
         byte[] cfHashed = ServerUtils.encryptWithSalt(cfBytes, saltCf);
-        byte[] passwordHashed = ServerUtils.encryptWithSalt(passwordBytes, passwordSalt);
+        byte[] hashedPassword = ServerUtils.encryptWithSalt(passwordBytes, passwordSalt);
+        
+//        System.out.println(Arrays.toString(hashedPassword));
 
-        if (!this.database.addUser(cfHashed, passwordHashed, passwordSalt, keyInfo)) {
+        if (!this.database.addUser(cfHashed, hashedPassword, passwordSalt, keyInfo)) {
             throw new InsertFailedException("User registration failed");
         }
         return true;
     }
 
-    public LinkedList<Seed> getPositiveSeed(){
+    public LinkedList<Seed> getPositiveSeed() {
         LinkedList<Seed> positiveSeed = this.database.getAllPositiveSeeds();
         return positiveSeed;
     }
@@ -315,7 +315,7 @@ public class AppServer {
         return null;
     }
 
-    public boolean useNotification(String swab, String cf){
+    public boolean useNotification(String swab, String cf) {
         // Verificare che il codice esista
         // Verificare che la persona a cui è assegnato è cf
         // Verificare che sigma sia valido

@@ -49,14 +49,10 @@ public class Database {
             user.setLastLoginDate(lastLoginDate);
         }
         if (minSeedDate != null) {
-            String[] info = user.getDecryptedInfo(keyInfo).split("_");
-            info[1] = "" + minSeedDate.getTime();
-            user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
+            user.setMinimumSeedDate(minSeedDate, keyInfo);
         }
         if (lastRiskRequestDate != null) {
-            String[] info = user.getDecryptedInfo(keyInfo).split("_");
-            info[3] = "" + lastRiskRequestDate.getTime();
-            user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
+            user.setLastRiskRequestDate(lastRiskRequestDate, keyInfo);
         }
     }
 
@@ -75,10 +71,8 @@ public class Database {
         if (user == null) return null;
         updateUser(user, lastLoginDate, minimumSeedDate, lastRiskRequestDate, keyInfo);
         // UPDATE HAD_REQUEST_SEED AND IS_POSITIVE
-        String[] info = user.getDecryptedInfo(keyInfo).split("_");
-        info[2] = isPositive ? "true" : "false";
-        info[4] = hadRequestSeed ? "true" : "false";
-        user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
+        user.setIsPositive(isPositive, keyInfo);
+        user.setHadRequestSeed(hadRequestSeed, keyInfo);
         return user;
     }
 
@@ -88,9 +82,7 @@ public class Database {
         if (user == null) return null;
         updateUser(user, lastLoginDate, minimumSeedDate, lastRiskRequestDate, keyInfo);
         // UPDATE IS_POSITIVE
-        String[] info = user.getDecryptedInfo(keyInfo).split("_");
-        info[2] = isPositive ? "true" : "false";
-        user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
+        user.setIsPositive(isPositive, keyInfo);
         return user;
     }
 
@@ -100,9 +92,7 @@ public class Database {
         if (user == null) return null;
         updateUser(user, lastLoginDate, minimumSeedDate, lastRiskRequestDate, keyInfo);
         // UPDATE HAD_REQUEST_SEED
-        String[] info = user.getDecryptedInfo(keyInfo).split("_");
-        info[4] = hadRequestSeed ? "true" : "false";
-        user.setInfo(ServerUtils.toByteArray(String.join("_", info)));
+        user.setHadRequestSeed(hadRequestSeed, keyInfo);
         return user;
     }
     // END USER

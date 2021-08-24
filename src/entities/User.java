@@ -15,6 +15,7 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Objects;
@@ -31,18 +32,19 @@ public class User {
     private byte[] info;
 
     public User(byte[] hashedCf, byte[] hashedPassword, byte[] passwordSalt,
-                Timestamp minimumSeedDate, Timestamp lastRiskRequestDate,
-                boolean hadRequestSeed, boolean isPositive,
-                SecretKey keyInfo) {
+            Timestamp minimumSeedDate, Timestamp lastRiskRequestDate,
+            boolean hadRequestSeed, boolean isPositive,
+            SecretKey keyInfo) {
         this.hashedCf = hashedCf;
         this.hashedPassword = hashedPassword;
         this.lastLoginDate = null;
         this.info = encryptInfo(passwordSalt, minimumSeedDate, lastRiskRequestDate, hadRequestSeed, isPositive, keyInfo);
     }
+
     public User(byte[] hashedCf, byte[] hashedPassword, byte[] passwordSalt,
-                Timestamp lastLoginDate, Timestamp minimumSeedDate, Timestamp lastRiskRequestDate,
-                boolean hadRequestSeed, boolean isPositive,
-                SecretKey keyInfo) {
+            Timestamp lastLoginDate, Timestamp minimumSeedDate, Timestamp lastRiskRequestDate,
+            boolean hadRequestSeed, boolean isPositive,
+            SecretKey keyInfo) {
         this.hashedCf = hashedCf;
         this.hashedPassword = hashedPassword;
         this.lastLoginDate = lastLoginDate;
@@ -55,48 +57,130 @@ public class User {
         this.info = encryptInfo(passwordSalt, null, null, false, false, keyInfo);
     }
 
-    private byte[] encryptInfo(byte[] passwordSalt,
-                               Timestamp minimumSeedDate, Timestamp lastRiskRequestDate,
-                               boolean hadRequestSeed, boolean isPositive,
-                               SecretKey keyInfo) {
-        String info =
-                BytesUtils.toString(passwordSalt) + "_" +
-                (minimumSeedDate == null ? -1 : minimumSeedDate.getTime()) + "_" +
-                isPositive + "_" +
-                (lastRiskRequestDate == null ? -1 : lastRiskRequestDate.getTime()) + "_" +
-                hadRequestSeed;
-
-        try {
-            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, keyInfo);
-            return cipher.doFinal(ServerUtils.toByteArray(info));
-        } catch (IllegalBlockSizeException | BadPaddingException | InvalidKeyException | NoSuchPaddingException | NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        }
-        throw new RuntimeException("EncryptInfo Failed");
+    public byte[] getEncryptedInfo(SecretKey keyInfo) {
+        return this.info;
     }
 
-    public String getDecryptedInfo(SecretKey keyInfo) {
+    public byte[] getDecryptedInfo(SecretKey keyInfo) {
         try {
             Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
             cipher.init(Cipher.DECRYPT_MODE, keyInfo);
-            byte[] data = cipher.doFinal(info);
-            return new String(data, StandardCharsets.UTF_8);
+            return cipher.doFinal(info);
         } catch (IllegalBlockSizeException | BadPaddingException | InvalidKeyException | NoSuchPaddingException | NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
         throw new RuntimeException("Decrypt Info Failed");
     }
 
-    public void setEncryptInfo(String info, SecretKey keyInfo) {
+    private void setEncryptedInfo(byte[] encryptedInfo) {
+        this.info = encryptedInfo;
+    }
+
+    public void setInfo(byte[] passwordSalt,
+            Timestamp minimumSeedDate, Timestamp lastRiskRequestDate,
+            boolean hadRequestSeed, boolean isPositive,
+            SecretKey keyInfo) {
+        this.setEncryptedInfo(this.encryptInfo(passwordSalt,
+                minimumSeedDate,
+                lastRiskRequestDate,
+                hadRequestSeed,
+                isPositive,
+                keyInfo));
+    }
+
+    public void setDecryptedInfo(byte[] decryptedInfo, SecretKey keyInfo) {
+        this.setEncryptedInfo(this.encryptInfo(decryptedInfo, keyInfo));
+    }
+
+    private byte[] encryptInfo(byte[] passwordSalt,
+            Timestamp minimumSeedDate, Timestamp lastRiskRequestDate,
+            boolean hadRequestSeed, boolean isPositive,
+            SecretKey keyInfo) {
+
+        byte[] minimumSeedDateBytes = BytesUtils.fromTimestamp(minimumSeedDate);
+        byte[] lastRiskRequestDateBytes = BytesUtils.fromTimestamp(lastRiskRequestDate);
+
+        byte[] decryptedInfo = BytesUtils.concat(passwordSalt,
+                minimumSeedDateBytes,
+                lastRiskRequestDateBytes,
+                new byte[]{(byte) (hadRequestSeed ? 1 : 0)},
+                new byte[]{(byte) (isPositive ? 1 : 0)});
+        return this.encryptInfo(decryptedInfo, keyInfo);
+    }
+
+    private byte[] encryptInfo(byte[] decryptedInfo, SecretKey keyInfo) {
         try {
             Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
             cipher.init(Cipher.ENCRYPT_MODE, keyInfo);
-            this.info = cipher.doFinal(ServerUtils.toByteArray(info));
+            return cipher.doFinal(decryptedInfo);
         } catch (IllegalBlockSizeException | BadPaddingException | InvalidKeyException | NoSuchPaddingException | NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
-        throw new RuntimeException("EncryptInfo Failed");
+        return null;
+    }
+
+    public byte[] getPasswordSalt(SecretKey keyInfo) {
+        return Arrays.copyOfRange(this.getDecryptedInfo(keyInfo), 0, 32);
+    }
+
+    public void setPasswordSalt(byte[] passwordSalt, SecretKey keyInfo) {
+        byte[] decryptedInfo = this.getDecryptedInfo(keyInfo);
+        byte[] decryptedInfoWithoutOldPasswordSalt = Arrays.copyOfRange(decryptedInfo, 32, decryptedInfo.length);
+        this.setDecryptedInfo(BytesUtils.concat(passwordSalt, decryptedInfoWithoutOldPasswordSalt), keyInfo);
+    }
+
+    public Timestamp getMinimumSeedDate(SecretKey keyInfo) {
+        byte[] decryptedInfo = this.getDecryptedInfo(keyInfo);
+        return Timestamp.valueOf(new String(Arrays.copyOfRange(decryptedInfo, 32, 32 + BytesUtils.TIMESTAMP_BYTES_SIZE)));
+    }
+
+    public void setMinimumSeedDate(Timestamp minimumSeedDate, SecretKey keyInfo) {
+        byte[] decryptedInfo = this.getDecryptedInfo(keyInfo);
+        byte[] firstDecryptedPart = Arrays.copyOfRange(decryptedInfo, 0, 32);
+        byte[] lastDecryptedPart = Arrays.copyOfRange(decryptedInfo, 32 + BytesUtils.TIMESTAMP_BYTES_SIZE, decryptedInfo.length);
+
+        byte[] minimumSeedDateBytes = minimumSeedDate.toString().getBytes();
+        this.setDecryptedInfo(BytesUtils.concat(firstDecryptedPart, minimumSeedDateBytes, lastDecryptedPart), keyInfo);
+    }
+
+    public Timestamp getLastRiskRequestDate(SecretKey keyInfo) {
+        byte[] decryptedInfo = this.getDecryptedInfo(keyInfo);
+        return Timestamp.valueOf(new String(Arrays.copyOfRange(
+                decryptedInfo,
+                32 + BytesUtils.TIMESTAMP_BYTES_SIZE,
+                decryptedInfo.length - 3
+        )));
+    }
+
+    public void setLastRiskRequestDate(Timestamp lastRiskRequestDate, SecretKey keyInfo) {
+        byte[] decryptedInfo = this.getDecryptedInfo(keyInfo);
+        byte[] firstDecryptedPart = Arrays.copyOfRange(decryptedInfo, 0, 32);
+        byte[] lastDecryptedPart = Arrays.copyOfRange(decryptedInfo, 32 + 2 * BytesUtils.TIMESTAMP_BYTES_SIZE, decryptedInfo.length);
+
+        byte[] lastRiskRequestDateBytes = lastRiskRequestDate.toString().getBytes();
+        this.setDecryptedInfo(BytesUtils.concat(firstDecryptedPart, lastRiskRequestDateBytes, lastDecryptedPart), keyInfo);
+    }
+
+    public boolean getHadRequestSeed(SecretKey keyInfo) {
+        byte[] decryptedInfo = this.getDecryptedInfo(keyInfo);
+        return decryptedInfo[decryptedInfo.length - 2] == 1;
+    }
+
+    public void setHadRequestSeed(boolean hadRequestSeed, SecretKey keyInfo) {
+        byte[] decryptedInfo = this.getDecryptedInfo(keyInfo);
+        decryptedInfo[decryptedInfo.length - 2] = (byte) (hadRequestSeed ? 1 : 0);
+        this.setDecryptedInfo(decryptedInfo, keyInfo);
+    }
+
+    public boolean getIsPositive(SecretKey keyInfo) {
+        byte[] decryptedInfo = this.getDecryptedInfo(keyInfo);
+        return decryptedInfo[decryptedInfo.length - 1] == 1;
+    }
+
+    public void setIsPositive(boolean isPositive, SecretKey keyInfo) {
+        byte[] decryptedInfo = this.getDecryptedInfo(keyInfo);
+        decryptedInfo[decryptedInfo.length - 1] = (byte) (isPositive ? 1 : 0);
+        this.setDecryptedInfo(decryptedInfo, keyInfo);
     }
 
     public byte[] getHashedCf() {

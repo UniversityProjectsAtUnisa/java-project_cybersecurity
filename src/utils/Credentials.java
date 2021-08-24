@@ -3,6 +3,7 @@ package utils;
 import java.io.Serializable;
 
 public class Credentials implements Serializable {
+
     private final String cf;
     private final String password;
 
@@ -17,5 +18,10 @@ public class Credentials implements Serializable {
 
     public String getPassword() {
         return password;
+    }
+
+    @Override
+    public String toString() {
+        return "[ Credentials: {cf: " + getCf() + ", password: " + password + "} ]";
     }
 }

@@ -24,26 +24,28 @@ import java.sql.Timestamp;
  */
 public final class AuthToken extends Token {
 
-    private Cipher cipher = Cipher.getInstance("AES/CRC/PKCS5Padding");
-
     public AuthToken(byte[] hashedCf, SecretKey keyToken, byte[] saltToken, Timestamp creationDate) throws NoSuchAlgorithmException,
             InvalidKeyException, IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException {
         super(BytesUtils.toString(AuthToken.getEncryptedToken(hashedCf, keyToken, creationDate)), saltToken);
     }
 
-    public byte[] getCfToken(SecretKey keyToken) {
+    private static Cipher getCipher() throws NoSuchAlgorithmException, NoSuchPaddingException {
+        return Cipher.getInstance("AES/ECB/PKCS5Padding");
+    }
+
+    public byte[] getCfToken(SecretKey keyToken) throws Exception {
         String[] payloadParts = getDecryptedPayload(keyToken);
         return ServerUtils.toByteArray(payloadParts[0]);
     }
 
-    public Timestamp getCreatedAt(SecretKey keyToken) {
+    public Timestamp getCreatedAt(SecretKey keyToken) throws Exception {
         String[] payloadParts = getDecryptedPayload(keyToken);
         return Timestamp.valueOf(payloadParts[1]);
     }
 
     static byte[] getEncryptedToken(byte[] hashedCf, SecretKey keyToken, Timestamp creationDate) throws InvalidKeyException,
             IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException, NoSuchAlgorithmException {
-        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+        Cipher cipher = getCipher();
         String payloadStr = BytesUtils.toString(hashedCf) + "_" + creationDate;
         cipher.init(Cipher.ENCRYPT_MODE, keyToken);
         return cipher.doFinal(ServerUtils.toByteArray(payloadStr));
@@ -54,17 +56,18 @@ public final class AuthToken extends Token {
         return "AuthToken: " + super.toString();
     }
 
-    public boolean isValid(Timestamp lastLogin, SecretKey keyToken, byte[] saltToken) throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+    public boolean isValid(Timestamp lastLogin, SecretKey keyToken, byte[] saltToken) throws Exception {
         Timestamp createdAt = getCreatedAt(keyToken);
         return createdAt.equals(lastLogin) && verifySigma(saltToken);
     }
 
-    private String[] getDecryptedPayload(SecretKey keyToken) {
+    private String[] getDecryptedPayload(SecretKey keyToken) throws NoSuchAlgorithmException, NoSuchPaddingException {
         try {
             String[] parts = this.getPayload().split(",");
             if (parts.length != 2) {
                 throw new InvalidTokenFormatException("The payload does not contain exactly one comma");
             }
+            Cipher cipher = getCipher();
             cipher.init(Cipher.DECRYPT_MODE, keyToken);
             byte[] decodedPayload = cipher.doFinal(ServerUtils.toByteArray(parts[0]));
             return BytesUtils.toString(decodedPayload).split("_");
