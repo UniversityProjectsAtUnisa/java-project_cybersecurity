@@ -6,7 +6,7 @@ public class Config {
     public static final int RISK_SECONDS = 1;
 
     public static final int TC = 1000;
-    public static final int TSEME = 10000;
+    public static final int TSEME = 5000;
     public static final int N_CUM = 30;
     
     public static final int CONTACT_DURATION_DAYS = 20;

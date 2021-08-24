@@ -1,10 +1,7 @@
 package src.AppServer;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
+import java.security.*;
 import java.util.*;
 import java.sql.Timestamp;
 
@@ -46,7 +43,7 @@ public class AppServer {
     private byte[] seedPassword = new byte[32];
     private byte[] seedToken = new byte[32];
     private byte[] saltToken = new byte[32];
-    private byte[] saltSwab = new byte[32];
+    private SecretKey keySigmaSwab;
     /*private byte[] saltPassword;*/
     private byte[] saltCode = new byte[32];
 
@@ -107,7 +104,7 @@ public class AppServer {
         key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "saltToken");
         this.saltToken = key1.getEncoded();
         key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "saltSwab");
-        this.saltSwab = key1.getEncoded();
+        this.keySigmaSwab = new SecretKeySpec(key1.getEncoded(), 0, key1.getEncoded().length, "AES");
         key1 = ServerUtils.loadFromKeyStore("./salts_keystore.jks", "changeit", "saltCode");
         this.saltCode = key1.getEncoded();
 
@@ -164,7 +161,7 @@ public class AppServer {
         String endpointName = req.getEndpointName();
         User loggedUser = null;
         try {
-            /*if (!endpointName.equals("login") && !endpointName.equals("register")) {
+            if (!endpointName.equals("login") && !endpointName.equals("register")) {
                 AuthToken token = req.getToken();
                 if (token == null) {
                     throw new AuthenticationException("The authentication token is not valid");
@@ -177,7 +174,7 @@ public class AppServer {
                 if (!token.isValid(lastLoginDate, keyToken, saltToken)) {
                     throw new AuthenticationException("The authentication token is not valid");
                 }
-            }*/
+            }
             AuthToken token;
             byte[] hashedCf;
             Logger.getGlobal().info("the endpoint is " + endpointName);
@@ -192,22 +189,18 @@ public class AppServer {
                     data = this.register(registerData.getCf(), registerData.getPassword());
                     break;
                 case "isPositive":
-                    token = req.getToken();
-                    hashedCf = token.getCfToken(keyToken);
-                    data = this.isPositive(hashedCf);
+                    data = isPositive(loggedUser);
                     break;
                 case "sendPositiveData":
-                    PositiveContact[] codes = (PositiveContact[]) req.getPayload();
-                    data = this.sendPositiveSeed(codes);
+                    List<PositiveContact> codes = (LinkedList<PositiveContact>) req.getPayload();
+                    data = this.sendPositiveSeed(loggedUser, codes);
                     break;
                 case "getPositiveSeeds":
-                    data = this.getPositiveSeed();
+                    data = this.getPositiveSeed(loggedUser);
                     break;
                 case "isAtRisk":
-                    HashMap<Seed, List<CodePair>> contactMap = (HashMap<Seed, List<CodePair>>) req.getPayload();
-                    token = req.getToken();
-                    hashedCf = token.getCfToken(keyToken);
-                    data = this.isAtRisk(hashedCf, contactMap);
+                    List<Seed> userSeeds = (LinkedList<Seed>) req.getPayload();
+                    data = this.isAtRisk(loggedUser, userSeeds);
                     break;
             }
             return Response.make(data);
@@ -231,10 +224,7 @@ public class AppServer {
         }
         byte[] passwordBytes = password.getBytes();
         byte[] passwordSalt = user.getPasswordSalt(keyInfo);
-        System.out.println(Arrays.toString(passwordSalt));
         byte[] hashedPassword = ServerUtils.encryptWithSalt(passwordBytes, passwordSalt);
-
-//        System.out.println(Arrays.toString(hashedPassword));
 
         if (Arrays.equals(hashedPassword, user.getHashedPassword())) {
             Timestamp d = ServerUtils.getNow();
@@ -254,12 +244,8 @@ public class AppServer {
         byte[] passwordSalt = new byte[32];
         saltPasswordGenerator.nextBytes(passwordSalt);
 
-        System.out.println(Arrays.toString(passwordSalt));
-
         byte[] cfHashed = ServerUtils.encryptWithSalt(cfBytes, saltCf);
         byte[] hashedPassword = ServerUtils.encryptWithSalt(passwordBytes, passwordSalt);
-        
-//        System.out.println(Arrays.toString(hashedPassword));
 
         if (!this.database.addUser(cfHashed, hashedPassword, passwordSalt, keyInfo)) {
             throw new InsertFailedException("User registration failed");
@@ -267,54 +253,79 @@ public class AppServer {
         return true;
     }
 
-    public LinkedList<Seed> getPositiveSeed() {
-        LinkedList<Seed> positiveSeed = this.database.getAllPositiveSeeds();
-        return positiveSeed;
+    // FASE 3
+    public boolean isPositive(User user) {
+        return user.getIsPositive(keyInfo);
     }
 
-    public boolean isPositive(byte[] cfHashed) throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-        User u = this.database.findUser(cfHashed);
-        cipher.init(Cipher.DECRYPT_MODE, keyInfo);
-        byte[] decodedInfo = cipher.doFinal(u.getInfo());
-        String[] info = decodedInfo.toString().split("_");
-        return info[2] != "false";
-    }
+    public boolean sendPositiveSeed(User user, List<PositiveContact> pcs) {
+        // Remove duplicates
+        Map<String, PositiveContact> uniquePcs = new HashMap<>();
+        pcs.forEach(pc -> uniquePcs.put(Arrays.toString(pc.getSeed()), pc));
 
-    public boolean sendPositiveSeed(PositiveContact[] pcs) {
-        LinkedList<byte[]> insertedSeeds = new LinkedList<>();
-        for (PositiveContact pc : pcs) {
-            byte[] seed = pc.getSeed();
-            if (!this.database.createPositiveContact(seed, pc.getSeedCreationDate(), pc.getDetectedCodes())) {
-                for (byte[] s : insertedSeeds) {
-                    this.database.removePositiveContact(s);
-                }
-                return false;
-            }
-            insertedSeeds.add(seed);
+        for (PositiveContact plainPc : uniquePcs.values()) {
+            // Encrypt every code pairs and database insert
+            List<CodePair> encPairs = encryptCodePairs(plainPc.getDetectedCodes());
+            boolean res = database.createPositiveContact(plainPc.getSeed(), plainPc.getSeedCreationDate(), encPairs);
+            if (!res) throw new RuntimeException("Unable to create positive contact!");
         }
+        // UPDATE USER: lastRiskRequestDate=Date.now(), hadRequestSeed=true, isPositive=false
+        database.updateUser(user.getHashedCf(), null, null, ServerUtils.getNow(), true, false, keyInfo);
         return true;
     }
 
-    public String isAtRisk(byte[] hashedCf, HashMap<Seed, List<CodePair>> contactMap) throws NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
-        int count = 0;
-        for (Seed seed : contactMap.keySet()) {
-            if (this.database.findPositiveContact(seed.getValue()) != null) {
-                count++;
-            }
-        }
-        if (count >= 60) {
+    // FASE 4
+    public LinkedList<Seed> getPositiveSeed(User user) {
+        // CHECK: lastRiskRequestDate, hadRequestSeed=false
+        if (user.getHadRequestSeed(keyInfo))
+            return null;
+        else if (isDateInCurrentInterval(user.getLastRiskRequestDate(keyInfo)))
+            return null;
+        // FILTER SEEDS WHERE: data_generazione > max(data_corrente - 20 giorni,  data_minima_semi)
+        long minSeedDate = user.getMinimumSeedDate(keyInfo);
+        List<Seed> filtered = database
+                .getAllPositiveSeeds()
+                .stream()
+                .filter(s -> {
+                    long dMin = Math.max(minSeedDate, ServerUtils.getNow().getTime());
+                    return s.getGenDate() > dMin / Config.TC;
+                })
+                .toList();
+        // UPDATE USER: lastRiskRequestDate=Date.now(), hadRequestSeed=true
+        database.updateUser(user.getHashedCf(), null, null, true, ServerUtils.getNow(), keyInfo);
+        return new LinkedList<>(filtered);
+    }
+
+    public String isAtRisk(User user, List<Seed> userSeeds) throws IllegalBlockSizeException, BadPaddingException, InvalidKeyException, NoSuchAlgorithmException {
+        // Encrypt every code pairs in the ContactMap
+        int n = countValidContactReports(userSeeds);
+        // If user is at risk: n * Tc > millis(15)
+        if (n * Config.TC > 15 * 60 * 1000) {
+
             byte[] swabSalt = new byte[32];
             swabGenerator.nextBytes(swabSalt);
-            byte[] swabCf = ServerUtils.encryptWithSalt(hashedCf, saltSwab);
+
+            byte[] swabCf = BytesUtils.concat(user.getHashedCf(), swabSalt);
             cipher.init(Cipher.ENCRYPT_MODE, keySwab);
-            byte[] encriptedSwab = cipher.doFinal(swabCf);
-            byte[] hmac = ServerUtils.encryptWithSalt(swabSalt, ServerUtils.encryptWithSalt(swabSalt, swabCf));
-            this.database.createSwab(encriptedSwab, ServerUtils.getNow(), false);
-            return BytesUtils.toString(encriptedSwab) + "_" + BytesUtils.toString(hmac);
+            byte[] encryptedSwab = cipher.doFinal(swabCf);
+
+            Mac hMac = Mac.getInstance("HMacSHA256");
+            hMac.init(keySigmaSwab);
+            hMac.update(encryptedSwab);
+            byte[] hmac = hMac.doFinal();
+            // byte[] hmac = ServerUtils.encryptWithSalt(saltSwab, ServerUtils.encryptWithSalt(saltSwab, swabCf));
+
+            database.createSwab(encryptedSwab, ServerUtils.getNow());
+
+            return BytesUtils.toString(encryptedSwab) + "_" + BytesUtils.toString(hmac);  // FIXME: SOSPETTO
         }
+
+        // database.updateUser();
+
         return null;
     }
 
+    // HA REQUESTS
     public boolean useNotification(String swab, String cf) {
         // Verificare che il codice esista
         // Verificare che la persona a cui è assegnato è cf
@@ -329,5 +340,62 @@ public class AppServer {
 
     public boolean notifyPositiveUser(String cf) {
         return true;
+    }
+
+    private List<CodePair> encryptCodePairs(List<CodePair> plainCodePairs) {
+        return plainCodePairs
+                .stream()
+                .map(pair -> new CodePair(ServerUtils.encryptWithSalt(pair.getCode(), saltCode), pair.getInstant()))
+                .toList();
+    }
+
+    private int countValidContactReports(List<Seed> seeds) {
+        // PRE-CHECKS: no-duplicates, each seed has max Tseme / Tc instants, each seed is not a positive seed.
+        HashMap<String, List<Long>> mappedPairs = new HashMap<>();
+        for (Seed s: seeds) {
+            List<Long> list = mappedPairs.computeIfAbsent(Arrays.toString(s.getValue()), k -> new LinkedList<>());
+            list.add(s.getGenDate());
+        }
+        for (List<Long> instants: mappedPairs.values()) {
+            // duplicate check
+            if (new HashSet<>(instants).size() != instants.size())
+                return 0;
+            // max Tseme / Tc check
+            if (instants.size() > Config.TSEME / Config.TC)
+                return 0;
+        }
+        // check if user seeds are positive
+        for (Seed seed: seeds) {
+            if (database.findPositiveContact(seed.getValue()) != null)
+                return 0;
+        }
+        // COUNT
+        int count = 0;
+
+        for (Seed seed : seeds) {
+            long instant = seed.getGenDate();
+            byte[] code = generateCode(seed.getValue(), instant);
+            byte[] encryptedCode = ServerUtils.encryptWithSalt(code, saltCode);
+            List<PositiveContact> pcs = database.findPositiveContactByCode(encryptedCode, instant);
+            count += pcs.size();
+        }
+
+        return count;
+    }
+
+    private boolean isDateInCurrentInterval(long date) {
+        long now = ServerUtils.getNow().getTime();
+        long tStart = now - (now % Config.TSEME);
+        return date >= tStart && date <= tStart + Config.TSEME;
+    }
+
+    private byte[] generateCode(byte[] seedValue, long instant) {
+        byte[] concatenation = BytesUtils.concat(seedValue, BytesUtils.fromLong(instant));
+        try {
+            return MessageDigest.getInstance("SHA-256").digest(concatenation);
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        throw new RuntimeException("NoSuchAlgorithmException(SHA-256) in AppServer(generateCode)");
     }
 }

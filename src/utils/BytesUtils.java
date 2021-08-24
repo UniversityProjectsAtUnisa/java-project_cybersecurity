@@ -9,15 +9,20 @@ public class BytesUtils {
 
     public static int TIMESTAMP_BYTES_SIZE = Timestamp.valueOf(LocalDateTime.MIN).toString().getBytes().length;
 
-    private static ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
-
     public static byte[] zeroes(int length) {
         return new byte[length];
     }
 
     public static byte[] fromLong(long x) {
+        ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
         buffer.putLong(0, x);
         return buffer.array();
+    }
+
+    public static long toLong(byte[] bytes) {
+        ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
+        buffer.put(0, bytes);
+        return buffer.getLong();
     }
 
     public static byte[] fromTimestamp(Timestamp t) {

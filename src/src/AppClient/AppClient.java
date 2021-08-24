@@ -2,6 +2,7 @@ package src.AppClient;
 
 import apis.ServerApiService;
 import core.tokens.AuthToken;
+import entities.PositiveContact;
 import utils.BytesUtils;
 import utils.Credentials;
 
@@ -71,11 +72,13 @@ public class AppClient {
         boolean res = serverApi.isUserPositive(token);
         // SEND SEEDS, RECEIVED CODES WITH INSTANTS
         if (res) {
-            HashMap<Seed, List<CodePair>> data = new HashMap<>();
+            LinkedList<PositiveContact> data = new LinkedList<>();
             Map<Long, List<CodePair>> contactHistory = storage.getContactHistoryCopy();
             Map<Long, Seed> seedHistory = storage.getSeedHistoryCopy();
-            seedHistory.keySet().forEach(l -> data.put(seedHistory.get(l), contactHistory.get(l)));
-            return serverApi.sendSeedsAndReceivedCodes(data, token);
+            seedHistory.keySet().forEach(l -> data.add(new PositiveContact(seedHistory.get(l).getValue(), l, contactHistory.get(l))));
+            boolean sendRes = serverApi.sendSeedsAndReceivedCodes(data, token);
+            if (sendRes) storage.clear();
+            return sendRes;
         }
         return false;
     }
@@ -85,10 +88,13 @@ public class AppClient {
         // RETRIEVE FROM SERVER SEEDS OF POSITIVE USERS
         List<Seed> positiveSeeds = serverApi.getPositiveSeeds(token);
         // COMPUTE IF USER IS AT RISK
-        LinkedList<Seed> pairs = findContactPairs(positiveSeeds);
-        // SEND TO SERVER ALL PAIR FOUND
-        if (pairs.size() * Config.TC >= 15 * 60 * 1000) {  // 15 * 60 * 1000 are millis in 15 minutes
-            serverApi.reportContacts(pairs, token);
+        if (positiveSeeds != null) {
+            LinkedList<Seed> pairs = findContactPairs(positiveSeeds);
+            // SEND TO SERVER ALL PAIR FOUND
+            if (pairs.size() * Config.TC >= 15 * 60 * 1000) {  // 15 * 60 * 1000 are millis in 15 minutes
+                boolean res = serverApi.reportContacts(pairs, token);
+                if (res) storage.clear();
+            }
         }
     }
 

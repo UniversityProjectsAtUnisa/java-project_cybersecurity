@@ -3,6 +3,7 @@ package apis;
 import core.Response;
 import core.SSLClient;
 import core.tokens.AuthToken;
+import entities.PositiveContact;
 import exceptions.RequestFailedException;
 import src.AppClient.CodePair;
 import src.AppClient.Seed;
@@ -41,7 +42,7 @@ public class ServerApiService extends BaseApiService {
         return (boolean) res.getPayload();
     }
 
-    public boolean sendSeedsAndReceivedCodes(HashMap<Seed, List<CodePair>> history, AuthToken token) {
+    public boolean sendSeedsAndReceivedCodes(LinkedList<PositiveContact> history, AuthToken token) {
         Response res = sendRequest("sendPositiveData", history, token, "sendSeedsAndReceivedCodes");
         return (boolean) res.getPayload();
     }

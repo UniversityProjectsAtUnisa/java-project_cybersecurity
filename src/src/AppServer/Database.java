@@ -102,8 +102,8 @@ public class Database {
     // ----------------------------------------------------------------------------------------------------------------
     // SWAB
 
-    public boolean createSwab(byte[] swabCode, Timestamp creationDate, boolean isUsed) {
-        Swab s = new Swab(swabCode, creationDate, isUsed);
+    public boolean createSwab(byte[] swabCode, Timestamp creationDate) {
+        Swab s = new Swab(swabCode, creationDate, false);
         return swabs.putIfAbsent(BytesUtils.toString(swabCode), s) == null;
     }
 
@@ -127,13 +127,26 @@ public class Database {
     // CONTACTS
     // ----------------------------------------------------------------------------------------------------------------
 
-    public boolean createPositiveContact(byte[] seed, Timestamp creationDate, List<CodePair> detectedCodes){
+    public boolean createPositiveContact(byte[] seed, long creationDate, List<CodePair> detectedCodes){
         PositiveContact pc = new PositiveContact(seed, creationDate, detectedCodes);
         return positiveContacts.putIfAbsent(BytesUtils.toString(seed), pc) == null;
     }
 
     public PositiveContact findPositiveContact(byte[] seed){
         return positiveContacts.get(BytesUtils.toString(seed));
+    }
+
+    public List<PositiveContact> findPositiveContactByCode(byte[] code, long instant) {
+        return positiveContacts
+                .values()
+                .stream()
+                .filter(pc -> {
+                    for (CodePair pair: pc.getDetectedCodes())
+                        if (pair.getInstant() == instant && Arrays.equals(pair.getCode(), code))
+                            return true;
+                    return false;
+                })
+                .toList();
     }
 
     public boolean removePositiveContact(byte[] seed){
@@ -145,7 +158,7 @@ public class Database {
                 positiveContacts
                         .values()
                         .stream()
-                        .map(pc -> new Seed(pc.getSeedCreationDate().getTime(), pc.getSeed()))
+                        .map(pc -> new Seed(pc.getSeedCreationDate(), pc.getSeed()))
                         .toList()
         );
     }

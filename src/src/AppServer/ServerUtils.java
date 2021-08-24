@@ -16,6 +16,8 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
+
+import utils.BytesUtils;
 import utils.Config;
 
 public class ServerUtils {
@@ -58,25 +60,16 @@ public class ServerUtils {
 
         return bytes;
     }
-
-    public static byte[] concatByteArray(byte[] arr1, byte[] arr2) {
-        byte[] concatArr = new byte[arr1.length + arr2.length];
-        int pos = 0;
-        for (byte element : arr1) {
-            concatArr[pos] = element;
-            pos++;
-        }
-
-        for (byte element : arr2) {
-            concatArr[pos] = element;
-            pos++;
-        }
-        return concatArr;
-    }
     
-    public static byte[] encryptWithSalt(byte[] data, byte[] salt) throws NoSuchAlgorithmException{
-        byte[] concatenation = concatByteArray(data, salt);
-        return MessageDigest.getInstance("SHA-256").digest(concatenation);
+    public static byte[] encryptWithSalt(byte[] data, byte[] salt) {
+        byte[] concatenation = BytesUtils.concat(salt, data);
+        try {
+            return MessageDigest.getInstance("SHA-256").digest(concatenation);
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            System.exit(2);
+        }
+        throw new RuntimeException("NoSuchAlgorithmException in ServerUtils.encryptWithSalt");
     }
 
     public static boolean fileWrite(String path, String content) throws IOException {
@@ -189,4 +182,13 @@ public class ServerUtils {
         return flag;
     }
 
+    public static boolean secureByteCompare(byte[] bytes1, byte[] bytes2) {
+        boolean flag = true;
+        int index = 0;
+        for (byte b1 : bytes1){
+            flag = flag && (b1 == bytes2[index]);
+            index ++;
+        }
+        return flag;
+    }
 }

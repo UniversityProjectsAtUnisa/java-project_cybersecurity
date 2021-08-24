@@ -12,6 +12,11 @@ public class LocalStorage {
         contactHistory.put(seed.getGenDate(), receivedCodes);
     }
 
+    public void clear() {
+        seedHistory.clear();
+        contactHistory.clear();
+    }
+
     public HashMap<Long, List<CodePair>> getContactHistoryCopy() {
         return new HashMap<>(contactHistory);
     }

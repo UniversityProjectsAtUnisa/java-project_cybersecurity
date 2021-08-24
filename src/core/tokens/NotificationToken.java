@@ -21,9 +21,9 @@ import src.AppServer.Database;
  * data_scadenza),SHA256(sale_2 || SHA256(sale_1 || codice_fiscale)))
  *
  */
-public final class NotificationToken extends Token {
+public final class NotificationToken /*extends Token*/ {
 
-    public int getId() {
+    /*public int getId() {
         String[] parts = this.getPayload().split(",");
         if (parts.length != 2) {
             throw new InvalidTokenFormatException("The payload does not contain exactly one comma");
@@ -90,5 +90,5 @@ public final class NotificationToken extends Token {
         
         NotificationToken token = new NotificationToken(this.getId(), this.getExpireDate(), cf, salt1, salt2);
         return token.equals(token);
-    }
+    }*/
 }

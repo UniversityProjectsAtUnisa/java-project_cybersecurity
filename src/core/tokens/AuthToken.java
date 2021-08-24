@@ -17,6 +17,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.util.Arrays;
 
 /**
  * Auth: BASE64(id, data_creazione).HMACSHA256(BASE64(id, data_creazione),
@@ -26,7 +27,7 @@ public final class AuthToken extends Token {
 
     public AuthToken(byte[] hashedCf, SecretKey keyToken, byte[] saltToken, Timestamp creationDate) throws NoSuchAlgorithmException,
             InvalidKeyException, IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException {
-        super(BytesUtils.toString(AuthToken.getEncryptedToken(hashedCf, keyToken, creationDate)), saltToken);
+        super(AuthToken.getEncryptedToken(hashedCf, keyToken, creationDate), saltToken);
     }
 
     private static Cipher getCipher() throws NoSuchAlgorithmException, NoSuchPaddingException {
@@ -34,21 +35,15 @@ public final class AuthToken extends Token {
     }
 
     public byte[] getCfToken(SecretKey keyToken) throws Exception {
-        String[] payloadParts = getDecryptedPayload(keyToken);
-        return ServerUtils.toByteArray(payloadParts[0]);
+        byte[] decodedPayload = getDecryptedPayload(keyToken);
+        return Arrays.copyOfRange(decodedPayload, 0, decodedPayload.length - Long.BYTES);
     }
 
     public Timestamp getCreatedAt(SecretKey keyToken) throws Exception {
-        String[] payloadParts = getDecryptedPayload(keyToken);
-        return Timestamp.valueOf(payloadParts[1]);
-    }
-
-    static byte[] getEncryptedToken(byte[] hashedCf, SecretKey keyToken, Timestamp creationDate) throws InvalidKeyException,
-            IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException, NoSuchAlgorithmException {
-        Cipher cipher = getCipher();
-        String payloadStr = BytesUtils.toString(hashedCf) + "_" + creationDate;
-        cipher.init(Cipher.ENCRYPT_MODE, keyToken);
-        return cipher.doFinal(ServerUtils.toByteArray(payloadStr));
+        byte[] decodedPayload = getDecryptedPayload(keyToken);
+        int splitIndex = decodedPayload.length - Long.BYTES;
+        byte[] rawCreationDate = Arrays.copyOfRange(decodedPayload, splitIndex, decodedPayload.length);
+        return new Timestamp(BytesUtils.toLong(rawCreationDate));
     }
 
     @Override
@@ -58,19 +53,26 @@ public final class AuthToken extends Token {
 
     public boolean isValid(Timestamp lastLogin, SecretKey keyToken, byte[] saltToken) throws Exception {
         Timestamp createdAt = getCreatedAt(keyToken);
-        return createdAt.equals(lastLogin) && verifySigma(saltToken);
+        return lastLogin.getTime() == createdAt.getTime() && verifySigma(saltToken);
     }
 
-    private String[] getDecryptedPayload(SecretKey keyToken) throws NoSuchAlgorithmException, NoSuchPaddingException {
+    static byte[] getEncryptedToken(byte[] hashedCf, SecretKey keyToken, Timestamp creationDate) throws InvalidKeyException,
+            IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException, NoSuchAlgorithmException {
+        Cipher cipher = getCipher();
+        byte[] payloadStr = BytesUtils.concat(hashedCf, BytesUtils.fromLong(creationDate.getTime()));
+        cipher.init(Cipher.ENCRYPT_MODE, keyToken);
+        return cipher.doFinal(payloadStr);
+    }
+
+    private byte[] getDecryptedPayload(SecretKey keyToken) throws NoSuchAlgorithmException, NoSuchPaddingException {
         try {
-            String[] parts = this.getPayload().split(",");
-            if (parts.length != 2) {
-                throw new InvalidTokenFormatException("The payload does not contain exactly one comma");
-            }
             Cipher cipher = getCipher();
             cipher.init(Cipher.DECRYPT_MODE, keyToken);
-            byte[] decodedPayload = cipher.doFinal(ServerUtils.toByteArray(parts[0]));
-            return BytesUtils.toString(decodedPayload).split("_");
+            byte[] decodedPayload = cipher.doFinal(getPayload());
+            if (decodedPayload.length - Long.BYTES < 0) {
+                throw new InvalidTokenFormatException("The payload length is not valid");
+            }
+            return decodedPayload;
         } catch (IllegalBlockSizeException | BadPaddingException | InvalidKeyException e) {
             e.printStackTrace();
         }

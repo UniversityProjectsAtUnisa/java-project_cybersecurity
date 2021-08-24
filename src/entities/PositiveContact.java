@@ -9,10 +9,10 @@ import java.util.List;
 
 public class PositiveContact {
     private final byte[] seed;
-    private final Timestamp seedCreationDate;
+    private final long seedCreationDate;
     private final List<CodePair> detectedCodes;
 
-    public PositiveContact(byte[] seed, Timestamp seedCreationDate, List<CodePair> detectedCodes) {
+    public PositiveContact(byte[] seed, long seedCreationDate, List<CodePair> detectedCodes) {
         this.seed = seed;
         this.seedCreationDate = seedCreationDate;
         this.detectedCodes = detectedCodes;
@@ -22,7 +22,7 @@ public class PositiveContact {
         return seed;
     }
 
-    public Timestamp getSeedCreationDate() {
+    public long getSeedCreationDate() {
         return seedCreationDate;
     }
 

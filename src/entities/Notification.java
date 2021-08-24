@@ -17,7 +17,7 @@ import java.util.Objects;
  */
 public class Notification {
 
-    private final NotificationToken token;
+    /*private final NotificationToken token;
     private Timestamp suspensionDate;
 
     public Notification(String code) throws InvalidKeyException, NoSuchAlgorithmException {
@@ -30,10 +30,6 @@ public class Notification {
 
     public NotificationToken getToken() {
         return token;
-    }
-
-    public String getCode() {
-        return token.getCode();
     }
 
     public Timestamp getExpireDate() {
@@ -70,5 +66,5 @@ public class Notification {
 
     public void setSuspensionDate(Timestamp suspensionDate) {
         this.suspensionDate = suspensionDate;
-    }
+    }*/
 }

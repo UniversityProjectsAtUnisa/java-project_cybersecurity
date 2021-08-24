@@ -54,7 +54,8 @@ public class User {
     public User(byte[] hashedCf, byte[] hashedPassword, byte[] passwordSalt, SecretKey keyInfo) {
         this.hashedCf = hashedCf;
         this.hashedPassword = hashedPassword;
-        this.info = encryptInfo(passwordSalt, null, null, false, false, keyInfo);
+        Timestamp origin = new Timestamp(0);
+        this.info = encryptInfo(passwordSalt, origin , origin, false, false, keyInfo);
     }
 
     public byte[] getEncryptedInfo(SecretKey keyInfo) {
@@ -97,8 +98,8 @@ public class User {
             boolean hadRequestSeed, boolean isPositive,
             SecretKey keyInfo) {
 
-        byte[] minimumSeedDateBytes = BytesUtils.fromTimestamp(minimumSeedDate);
-        byte[] lastRiskRequestDateBytes = BytesUtils.fromTimestamp(lastRiskRequestDate);
+        byte[] minimumSeedDateBytes = BytesUtils.fromLong(minimumSeedDate.getTime());
+        byte[] lastRiskRequestDateBytes = BytesUtils.fromLong(lastRiskRequestDate.getTime());
 
         byte[] decryptedInfo = BytesUtils.concat(passwordSalt,
                 minimumSeedDateBytes,
@@ -129,35 +130,35 @@ public class User {
         this.setDecryptedInfo(BytesUtils.concat(passwordSalt, decryptedInfoWithoutOldPasswordSalt), keyInfo);
     }
 
-    public Timestamp getMinimumSeedDate(SecretKey keyInfo) {
+    public long getMinimumSeedDate(SecretKey keyInfo) {
         byte[] decryptedInfo = this.getDecryptedInfo(keyInfo);
-        return Timestamp.valueOf(new String(Arrays.copyOfRange(decryptedInfo, 32, 32 + BytesUtils.TIMESTAMP_BYTES_SIZE)));
+        return BytesUtils.toLong(Arrays.copyOfRange(decryptedInfo, 32, 32 + Long.BYTES));
     }
 
     public void setMinimumSeedDate(Timestamp minimumSeedDate, SecretKey keyInfo) {
         byte[] decryptedInfo = this.getDecryptedInfo(keyInfo);
         byte[] firstDecryptedPart = Arrays.copyOfRange(decryptedInfo, 0, 32);
-        byte[] lastDecryptedPart = Arrays.copyOfRange(decryptedInfo, 32 + BytesUtils.TIMESTAMP_BYTES_SIZE, decryptedInfo.length);
+        byte[] lastDecryptedPart = Arrays.copyOfRange(decryptedInfo, 32 + Long.BYTES, decryptedInfo.length);
 
-        byte[] minimumSeedDateBytes = minimumSeedDate.toString().getBytes();
+        byte[] minimumSeedDateBytes = BytesUtils.fromLong(minimumSeedDate.getTime());
         this.setDecryptedInfo(BytesUtils.concat(firstDecryptedPart, minimumSeedDateBytes, lastDecryptedPart), keyInfo);
     }
 
-    public Timestamp getLastRiskRequestDate(SecretKey keyInfo) {
+    public long getLastRiskRequestDate(SecretKey keyInfo) {
         byte[] decryptedInfo = this.getDecryptedInfo(keyInfo);
-        return Timestamp.valueOf(new String(Arrays.copyOfRange(
+        return BytesUtils.toLong(Arrays.copyOfRange(
                 decryptedInfo,
-                32 + BytesUtils.TIMESTAMP_BYTES_SIZE,
-                decryptedInfo.length - 3
-        )));
+                32 + Long.BYTES,
+                decryptedInfo.length - 2
+        ));
     }
 
     public void setLastRiskRequestDate(Timestamp lastRiskRequestDate, SecretKey keyInfo) {
         byte[] decryptedInfo = this.getDecryptedInfo(keyInfo);
-        byte[] firstDecryptedPart = Arrays.copyOfRange(decryptedInfo, 0, 32);
-        byte[] lastDecryptedPart = Arrays.copyOfRange(decryptedInfo, 32 + 2 * BytesUtils.TIMESTAMP_BYTES_SIZE, decryptedInfo.length);
+        byte[] firstDecryptedPart = Arrays.copyOfRange(decryptedInfo, 0, 32 + Long.BYTES);
+        byte[] lastDecryptedPart = Arrays.copyOfRange(decryptedInfo, 32 + 2 * Long.BYTES, decryptedInfo.length);
 
-        byte[] lastRiskRequestDateBytes = lastRiskRequestDate.toString().getBytes();
+        byte[] lastRiskRequestDateBytes = BytesUtils.fromLong(lastRiskRequestDate.getTime());
         this.setDecryptedInfo(BytesUtils.concat(firstDecryptedPart, lastRiskRequestDateBytes, lastDecryptedPart), keyInfo);
     }
 

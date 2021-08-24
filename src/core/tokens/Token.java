@@ -19,6 +19,7 @@ import exceptions.InvalidTokenFormatException;
 import exceptions.InvalidTokenSigmaException;
 import utils.BytesUtils;
 
+import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -28,49 +29,42 @@ import java.util.Objects;
  */
 public abstract class Token implements Serializable, Comparable<Token> {
 
-    private String payload;
-    private String sigma;
+    private byte[] payload;
+    private byte[] sigma;
 
 
-    public Token(String payload, byte[] key) throws InvalidKeyException, NoSuchAlgorithmException {
+    public Token(byte[] payload, byte[] key) throws InvalidKeyException, NoSuchAlgorithmException {
         this.payload = payload;
         this.sigma = calculateSigma(payload, key);
     }
 
-    private String calculateSigma(String payload, byte[] key) throws InvalidKeyException, NoSuchAlgorithmException {
-        byte[] bytePayload = ServerUtils.toByteArray(payload);
+    private byte[] calculateSigma(byte[] bytePayload, byte[] key) throws InvalidKeyException, NoSuchAlgorithmException {
         Mac hMac = Mac.getInstance("HMacSHA256");
         Key hMacKey = new SecretKeySpec(key, "HMacSHA256");
         hMac.init(hMacKey);
         hMac.update(bytePayload);
-        byte[] hMacRes = hMac.doFinal();
-        return BytesUtils.toString(hMacRes);
+        return hMac.doFinal();
     }
 
-    public Token(String raw) {
-        String[] parts = raw.split(".");
-        if (parts.length != 2) {
-            throw new InvalidTokenFormatException("The raw string does not contain only one .");
+    public Token(byte[] raw) {
+        int splitPoint = raw.length - 32;
+        if (splitPoint < 0) {
+            throw new InvalidTokenFormatException("The raw byte string length is not valid.");
         }
-        this.payload = parts[0];
-        this.sigma = parts[1];
+        this.payload = Arrays.copyOfRange(raw, 0, splitPoint);
+        this.sigma = Arrays.copyOfRange(raw, splitPoint, raw.length);
     }
 
-    public String getPayload() {
+    public byte[] getPayload() {
         return payload;
     }
 
-    public String getSigma() {
+    public byte[] getSigma() {
         return sigma;
     }
 
-    public String getCode() {
-        return this.getPayload() + "." + this.getSigma();
-    }
-
-    @Override
-    public String toString() {
-        return getCode();
+    public byte[] getCode() {
+        return BytesUtils.concat(payload, sigma);
     }
 
     @Override
@@ -85,25 +79,30 @@ public abstract class Token implements Serializable, Comparable<Token> {
             return false;
         }
         final Token other = (Token) obj;
-        if (!Objects.equals(this.payload, other.payload)) {
+        if (!ServerUtils.secureByteCompare(this.payload, other.payload)) {
             return false;
         }
-        if (!ServerUtils.dumbStringCompare(this.sigma, other.sigma)) {
+        if (!ServerUtils.secureByteCompare(this.sigma, other.sigma)) {
             return false;
         }
         return true;
     }
 
+    @Override
+    public String toString() {
+        return Arrays.toString(getCode());
+    }
+
     protected boolean verifySigma(byte[] key) throws InvalidKeyException, NoSuchAlgorithmException {
-        String calculatedSigma = this.calculateSigma(this.payload, key);
-        return ServerUtils.dumbStringCompare(calculatedSigma, this.sigma);
+        byte[] calculatedSigma = this.calculateSigma(this.payload, key);
+        return ServerUtils.secureByteCompare(calculatedSigma, this.sigma);
     }
 
     @Override
     public int compareTo(Token o) {
-        int c = payload.compareTo(o.getPayload());
+        int c = Arrays.compare(payload, o.getPayload());   // FIXME: a che serve? deve essere sicura?
         if (c == 0) {
-            c = sigma.compareTo(o.getSigma());
+            c = Arrays.compare(sigma, o.getSigma());   // FIXME: a che serve? deve essere sicura?
         }
         return c;
     }
