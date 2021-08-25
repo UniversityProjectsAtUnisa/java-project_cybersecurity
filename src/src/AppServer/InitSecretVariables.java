@@ -16,7 +16,8 @@ public class InitSecretVariables {
             "keySwab",
             "keyInfo",
             "seedTokenIv",
-            "seedSwabIv"
+            "seedSwabIv",
+            "seedUserIv"
     };
 
     public static void main(String[] args) throws Exception {
@@ -24,8 +25,8 @@ public class InitSecretVariables {
             byte[] rawKey = new byte[32];
             SecureRandom r = SecureRandom.getInstanceStrong();
             r.nextBytes(rawKey);
-            SecretKey key = new SecretKeySpec(rawKey, "AES");
-            ServerUtils.storeToKeyStore(key,"changeit","./salts_keystore.jks",alias);
+            SecretKey key = new SecretKeySpec(rawKey,"AES");
+            ServerUtils.storeToKeyStore(key,"changeit","./salts_keystore.jks", alias);
         }
     }
 }

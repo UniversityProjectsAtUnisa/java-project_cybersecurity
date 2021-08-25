@@ -5,7 +5,6 @@ import utils.BytesUtils;
 
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
-import java.io.Serializable;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;

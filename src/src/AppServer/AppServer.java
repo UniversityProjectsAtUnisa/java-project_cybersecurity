@@ -51,6 +51,7 @@ public class AppServer {
 
     private final byte[] seedTokenIv;
     private final byte[] seedSwabIv;
+    private final byte[] seedUserIv;
 
     private final SecretKey keyToken;
     private final SecretKey keyInfo;
@@ -63,11 +64,13 @@ public class AppServer {
     /**
      * saltPasswordGenerator is a csPRG that uses: seedPassword
      * swabGenerator is a csPRG that uses: seedToken
+     * tokenIvGenerator, swabIvGenerator, userIvGenerator are csPRG that generates IV per AES CBC
      */
-    private SecureRandom saltPasswordGenerator;
-    private SecureRandom swabGenerator;
-    private SecureRandom tokenIvGenerator;
-    private SecureRandom swabIvGenerator;
+    private final SecureRandom saltPasswordGenerator;
+    private final SecureRandom swabGenerator;
+    private final SecureRandom tokenIvGenerator;
+    private final SecureRandom swabIvGenerator;
+    private final SecureRandom userIvGenerator;
 
     /*
     SALTcf è una stringa di 256 bit puramente casuale.
@@ -116,6 +119,8 @@ public class AppServer {
         this.seedTokenIv = key1.getEncoded();
         key1 = ServerUtils.loadFromKeyStore(KEY_STORE, PASSWORD, "seedSwabIv");
         this.seedSwabIv = key1.getEncoded();
+        key1 = ServerUtils.loadFromKeyStore(KEY_STORE, PASSWORD, "seedUserIv");
+        this.seedUserIv = key1.getEncoded();
 
         key1 = ServerUtils.loadFromKeyStore(KEY_STORE, PASSWORD, "keyToken");
         this.keyToken = new SecretKeySpec(key1.getEncoded(), 0, key1.getEncoded().length, "AES");
@@ -128,6 +133,7 @@ public class AppServer {
         swabGenerator = new SecureRandom(seedToken);
         tokenIvGenerator = new SecureRandom(seedTokenIv);
         swabIvGenerator = new SecureRandom(seedSwabIv);
+        userIvGenerator = new SecureRandom(seedUserIv);
     }
 
     public void start() {
@@ -245,7 +251,7 @@ public class AppServer {
         byte[] cfHashed = ServerUtils.encryptWithSalt(cfBytes, saltCf);
         byte[] hashedPassword = ServerUtils.encryptWithSalt(passwordBytes, passwordSalt);
 
-        if (!this.database.addUser(cfHashed, hashedPassword, passwordSalt, keyInfo)) {
+        if (!database.addUser(cfHashed, hashedPassword, passwordSalt, keyInfo, userIvGenerator)) {
             throw new InsertFailedException("User registration failed");
         }
         return true;

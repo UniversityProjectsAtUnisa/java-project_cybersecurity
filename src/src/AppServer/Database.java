@@ -5,7 +5,10 @@ import src.AppClient.CodePair;
 import src.AppClient.Seed;
 import utils.BytesUtils;
 
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.sql.Timestamp;
 import java.util.*;
 
@@ -18,9 +21,14 @@ public class Database {
     // ----------------------------------------------------------------------------------------------------------------
     // USER
 
-    public boolean addUser(byte[] hashedCf, byte[] password, byte[] passwordSalt, SecretKey keyInfo) {
-        User u = new User(hashedCf, password, passwordSalt, keyInfo);
-        return users.putIfAbsent(BytesUtils.toString(hashedCf), u) == null;
+    public boolean addUser(byte[] hashedCf, byte[] password, byte[] passwordSalt, SecretKey keyInfo, SecureRandom userIvGenerator) {
+        try {
+            User u = new User(hashedCf, password, passwordSalt, keyInfo, userIvGenerator);
+            return users.putIfAbsent(BytesUtils.toString(hashedCf), u) == null;
+        } catch (NoSuchPaddingException | NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        throw new RuntimeException("Unable to create User");
     }
 
     public User findUser(byte[] hashedCf) {

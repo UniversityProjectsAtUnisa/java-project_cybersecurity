@@ -1,24 +1,14 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package entities;
 
-import src.AppServer.ServerUtils;
 import utils.BytesUtils;
 
 import javax.crypto.*;
-import java.nio.charset.StandardCharsets;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
-import java.time.LocalDateTime;
 import java.util.Arrays;
-import java.util.Date;
-import java.util.Objects;
 import javax.crypto.spec.IvParameterSpec;
 
 /**
@@ -30,30 +20,13 @@ public class User {
     private byte[] hashedPassword;
     private Timestamp lastLoginDate;
     private byte[] info;
+    private byte[] iv;
 
-    public User(byte[] hashedCf, byte[] hashedPassword, byte[] passwordSalt,
-            Timestamp minimumSeedDate, Timestamp lastRiskRequestDate,
-            boolean hadRequestSeed, boolean isPositive,
-            SecretKey keyInfo) {
+    public User(byte[] hashedCf, byte[] hashedPassword, byte[] passwordSalt, SecretKey keyInfo, SecureRandom userIvGenerator) throws NoSuchPaddingException, NoSuchAlgorithmException {
         this.hashedCf = hashedCf;
         this.hashedPassword = hashedPassword;
-        this.lastLoginDate = null;
-        this.info = encryptInfo(passwordSalt, minimumSeedDate, lastRiskRequestDate, hadRequestSeed, isPositive, keyInfo);
-    }
-
-    public User(byte[] hashedCf, byte[] hashedPassword, byte[] passwordSalt,
-            Timestamp lastLoginDate, Timestamp minimumSeedDate, Timestamp lastRiskRequestDate,
-            boolean hadRequestSeed, boolean isPositive,
-            SecretKey keyInfo) {
-        this.hashedCf = hashedCf;
-        this.hashedPassword = hashedPassword;
-        this.lastLoginDate = lastLoginDate;
-        this.info = encryptInfo(passwordSalt, minimumSeedDate, lastRiskRequestDate, hadRequestSeed, isPositive, keyInfo);
-    }
-
-    public User(byte[] hashedCf, byte[] hashedPassword, byte[] passwordSalt, SecretKey keyInfo) {
-        this.hashedCf = hashedCf;
-        this.hashedPassword = hashedPassword;
+        this.iv = new byte[Cipher.getInstance("AES/CBC/PKCS5Padding").getBlockSize()];
+        userIvGenerator.nextBytes(this.iv);
         Timestamp origin = new Timestamp(0);
         this.info = encryptInfo(passwordSalt, origin , origin, false, false, keyInfo);
     }
@@ -64,10 +37,10 @@ public class User {
 
     public byte[] getDecryptedInfo(SecretKey keyInfo) {
         try {
-            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-            cipher.init(Cipher.DECRYPT_MODE, keyInfo);
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(Cipher.DECRYPT_MODE, keyInfo, new IvParameterSpec(iv));
             return cipher.doFinal(info);
-        } catch (IllegalBlockSizeException | BadPaddingException | InvalidKeyException | NoSuchPaddingException | NoSuchAlgorithmException e) {
+        } catch (IllegalBlockSizeException | BadPaddingException | InvalidKeyException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidAlgorithmParameterException e) {
             e.printStackTrace();
         }
         throw new RuntimeException("Decrypt Info Failed");
@@ -111,10 +84,10 @@ public class User {
 
     private byte[] encryptInfo(byte[] decryptedInfo, SecretKey keyInfo) {
         try {
-            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, keyInfo);
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(Cipher.ENCRYPT_MODE, keyInfo, new IvParameterSpec(iv));
             return cipher.doFinal(decryptedInfo);
-        } catch (IllegalBlockSizeException | BadPaddingException | InvalidKeyException | NoSuchPaddingException | NoSuchAlgorithmException e) {
+        } catch (IllegalBlockSizeException | BadPaddingException | InvalidKeyException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidAlgorithmParameterException e) {
             e.printStackTrace();
         }
         return null;
